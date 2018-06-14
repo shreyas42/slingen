@@ -1,17 +1,17 @@
 #!/bin/bash
 
-# Path to python2.7 and python3.5. E.g., 
-#export PYTHON2BIN=/usr/bin/python2.7
-#export PYTHON3BIN=/usr/bin/python3.5
-export PYTHON2BIN=
-export PYTHON3BIN=
+# Path to python2.7 and python3.5. E.g.,
+export PYTHON2BIN=/usr/bin/python2.7
+export PYTHON3BIN=/usr/bin/python3.5
+#export PYTHON2BIN=
+#export PYTHON3BIN=
 
-# Path to python2.7 include folder. E.g., 
-#export PYTHON2INC=/usr/include/python2.7
-export PYTHON2INC=
+# Path to python2.7 include folder. E.g.,
+export PYTHON2INC=/usr/include/python2.7
+#export PYTHON2INC=
 
 # Uncomment and add path to libpython2.7 in case it's not available in (LD_)LIBRARY_PATH
-#export PYTHON2LIB=
+export PYTHON2LIB=/usr/lib64/libpython2.7.so
 
 export LIBRARY_PATH=$LIBRARY_PATH:$(readlink -f libs/lib):$PYTHON2LIB
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(readlink -f libs/lib):$PYTHON2LIB

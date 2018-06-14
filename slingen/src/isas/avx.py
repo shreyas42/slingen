@@ -26,7 +26,7 @@ from src.isas.sse2 import mmLoadSd, mmStoreSd, mmDivPd, mmSqrtPd
 
 class mm256LoadGs(RValue, VecAccess):
     ''' Wrapper of a vector load instruction.
-        
+
         Useful when we want to represent a composite load instruction as a single logical instruction and then have it
         easily replaced by a scalar during scalar replacement.
         '''
@@ -42,13 +42,13 @@ class mm256LoadGs(RValue, VecAccess):
         self.reglen = 8
         self.analysis = None
         self._content = None
-    
+
     @property
     def content(self):
         if self._content == None:
             self._content = self.generateContent()
         return self._content
-    
+
     def generateContent(self):
         mrmap = self.mrmap
         pointer = self.pointer
@@ -80,12 +80,12 @@ class mm256LoadGs(RValue, VecAccess):
                     content = mm256LoaduPs(pointer, zeromask)
                 else:
                     vmask = self.reglen*[0]
-                    vmask[:l] = l*[1] 
+                    vmask[:l] = l*[1]
                     content = mm256MaskloadPs(pointer, vmask, zeromask)
             else: # Incompact case should appear only if vertical
                 vmask = [1] + 7*[0]
                 es = [ mm256MaskloadPs(Pointer((pointer.mat, (pointer.at[0] + i, pointer.at[1]))), vmask) for i in range(l) ]
-                if l == 2: 
+                if l == 2:
                     content = mm256UnpackloPs(es[0], es[1])
                 elif l==3:
                     t0 = mm256UnpackloPs(es[0], es[1])
@@ -130,18 +130,18 @@ class mm256LoadGs(RValue, VecAccess):
         if content is None:
             raise ValueError('mm256LoadGs does not support mrmap %s with %s layout yet' % (str(mrmap), 'horizontal' if horizontal else 'vertical'))
         return content
-    
+
     def computeSym(self, nameList):
         return self.content.computeSym(self, nameList)
-    
+
     def getZMask(self):
         return self.content.getZMask()
-    
+
     def unparse(self, indent):
         content = self.content
         res = content.unparse(indent)
 #         res += "\n" + DebugPrint(["\""+getReference(icode, self.pointer.mat).physLayout.name+"\"", "\" [ \"", str(self.pointer.at[0]), "\" , \"", str(self.pointer.at[1]), "\" ] at line \"", "__LINE__"]).unparse(indent);
-        
+
 #         if self.analysis is not None and isinstance(self.analysis, IntervalCongruenceReductionAnalysis):
 #             content.env = self.env
 #             self.analysis.propagateEnvToSrcs(content)
@@ -151,24 +151,24 @@ class mm256LoadGs(RValue, VecAccess):
     def setIterSet(self, indices, iterSet):
         super(mm256LoadGs, self).setIterSet(indices, iterSet)
         self.setSpaceReadMap(indices, iterSet)
-    
+
     def printInst(self, indent):
 #         return 'mmLoadGs(%s, %s, %s)' % (str(self.mrmap), self.orientation, self.content.printInst(indent))
         return 'mm256LoadGs(%r, %r, %s)' % (self.pointer, self.mrmap, self.orientation)
-    
+
     def align(self, analysis):
         self.analysis = analysis
         return self
-    
+
     def __eq__(self, other):
         return isinstance(other, VecAccess) and self.reglen == other.reglen and self.pointer == other.pointer and self.mrmap == other.mrmap and (self.horizontal == other.horizontal or self.isCompact and other.isCompact)
-    
+
     def __hash__(self):
         return hash((hash('mm256LoadGs'), self.pointer.mat, self.pointer.at, str(self.mrmap), self.orientation))
 
 class mm256StoreGs(MovStatement):
     '''Wrapper of a vector store instruction.
-        
+
         Useful when we want to represent a composite store instruction as a single logical instruction and then have it
         easily replaced by a scalar during scalar replacement.
         '''
@@ -185,13 +185,13 @@ class mm256StoreGs(MovStatement):
         self.reglen = 8
         self.analysis = None
         self._content = None
-    
+
     @property
     def content(self):
         if self._content is None:
             self._content = self.generateContent()
         return self._content
-    
+
     def generateContent(self):
         dst = self.dst.pointer
         src = self.srcs[0]
@@ -210,13 +210,13 @@ class mm256StoreGs(MovStatement):
                     content = [mm256StoreuPs(src, dst)]
                 else:
                     vmask = self.reglen*[0]
-                    vmask[:l] = l*[1] 
+                    vmask[:l] = l*[1]
                     content = [mm256MaskstorePs(vmask, src, dst)]
             else: # Incompact case should appear only if vertical
                 content = []
                 vmask = [1] + 7*[0]
                 pcs = [ Pointer((dst.mat, (dst.at[0] + i, dst.at[1]))) for i in range(l) ]
-                if l == 2: 
+                if l == 2:
                     content.append( mm256MaskstorePs(vmask, src, pcs[0]) )
                     content.append( mm256MaskstorePs(vmask, mm256ShufflePs(src, src, (2,2,2,1)), pcs[1]) )
                 elif l==3:
@@ -262,11 +262,11 @@ class mm256StoreGs(MovStatement):
                     content.append( mm256MaskstorePs(vmask, mm256ShufflePs(lane1, mm256SetzeroPs(), (0,0,0,1)), pcs[5]) )
                     content.append( mm256MaskstorePs(vmask, mm256ShufflePs(lane1, mm256SetzeroPs(), (0,0,0,2)), pcs[6]) )
                     content.append( mm256MaskstorePs(vmask, mm256ShufflePs(lane1, mm256SetzeroPs(), (0,0,0,3)), pcs[7]) )
-        
+
         if content is None:
             raise ValueError('mm256StoreGs does not support mrmap %s with %s layout yet' % (str(mrmap), 'horizontal' if horizontal else 'vertical'))
         return content
-    
+
     def replaceRefs(self, refMap):
         dst = self.dst.replaceRefs(refMap)
         src = self.srcs[0].replaceRefs(refMap)
@@ -275,21 +275,21 @@ class mm256StoreGs(MovStatement):
             self.srcs[0] = src
             return self
         return Mov(src, dst)
-    
+
     @staticmethod
     def canStore(reglen, mrmap, horizontal, isAligned=False):
         return reglen == 8
-    
+
     @staticmethod
     def getStore(src, dst):
         mrmap = dst.mrmap
         if isinstance(mrmap, int):
             mrmap = [mrmap]
         return mm256StoreGs(src, dst, mrmap, dst.isCompact, dst.isCorner, dst.horizontal)
-    
+
     def computeSym(self, nameList):
         return self.srcs[0].computeSym(nameList)[:len(self.mrmap)]
-    
+
     def unparse(self, indent):
         content = self.content
 #         if self.analysis is not None and isinstance(self.analysis, IntervalCongruenceReductionAnalysis):
@@ -298,18 +298,18 @@ class mm256StoreGs(MovStatement):
 #                 self.analysis.propagateEnvToSrcs(instr)
 #             content = [instr.align(self.analysis) for instr in content]
         return '\n'.join(instr.unparse(indent) for instr in content)
-    
+
     def printInst(self, indent):
 #         return 'mmStoreGs(%s, %s, %s)' % (str(self.mrmap), self.orientation, ','.join([instr.printInst(indent) for instr in self._content]))
         return 'mm256StoreGs(%r, %r, %r, %s)' % (self.dst, self.srcs[0], self.mrmap, self.orientation)
-    
+
     def align(self, analysis):
         self.analysis = analysis
         return self
 
 class mm256LoadGd(RValue, VecAccess):
     ''' Wrapper of a vector load instruction.
-        
+
         Useful when we want to represent a composite load instruction as a single logical instruction and then have it
         easily replaced by a scalar during scalar replacement.
         '''
@@ -326,13 +326,13 @@ class mm256LoadGd(RValue, VecAccess):
         self.reglen = 4
         self.analysis = None
         self._content = None
-    
+
     @property
     def content(self):
         if self._content == None:
             self._content = self.generateContent()
         return self._content
-    
+
     def generateContent(self):
         mrmap = self.mrmap
         pointer = self.pointer
@@ -358,13 +358,13 @@ class mm256LoadGd(RValue, VecAccess):
 #                     content = asm256LoaduPd(pointer, zeromask)
                 else:
                     vmask = self.reglen*[0]
-                    vmask[:l] = l*[1] 
+                    vmask[:l] = l*[1]
                     content = mm256MaskloadPd(pointer, vmask, zeromask)
             else: # Incompact case should appear only if vertical
 #                 vmask = [1] + 3*[0]
 #                 es = [ mm256MaskloadPd(Pointer((pointer.mat, (pointer.at[0] + i, pointer.at[1]))), vmask) for i in range(l) ]
                 es = [ mm256CastPd128Pd256(mmLoadSd(Pointer((pointer.mat, (pointer.at[0] + i, pointer.at[1]))))) for i in range(l) ]
-                if l == 2: 
+                if l == 2:
                     content = mm256ShufflePd(es[0], es[1], [0,0,0,0])
                 elif l==3:
                     content = mm256Permute2f128Pd(mm256UnpackloPd(es[0], es[1]), es[2], [0,0,1,0,0,0,0,0])
@@ -379,13 +379,13 @@ class mm256LoadGd(RValue, VecAccess):
         if content is None:
             raise ValueError('mm256LoadGd does not support mrmap %s with %s layout yet' % (str(mrmap), 'horizontal' if horizontal else 'vertical'))
         return content
-    
+
     def computeSym(self, nameList):
         return self.content.computeSym(self, nameList)
-    
+
     def getZMask(self):
         return self.content.getZMask()
-    
+
     def unparse(self, indent):
         content = self.content
 #         if self.analysis is not None and isinstance(self.analysis, IntervalCongruenceReductionAnalysis):
@@ -397,24 +397,24 @@ class mm256LoadGd(RValue, VecAccess):
     def setIterSet(self, indices, iterSet):
         super(mm256LoadGd, self).setIterSet(indices, iterSet)
         self.setSpaceReadMap(indices, iterSet)
-    
+
     def printInst(self, indent):
 #         return 'mmLoadGs(%s, %s, %s)' % (str(self.mrmap), self.orientation, self.content.printInst(indent))
         return 'mm256LoadGd(%r, %r, %r, %s, isCompact=%s)' % (self.pointer, self.mrmap, self.not_using_mask, self.orientation, str(self.isCompact))
-    
+
     def align(self, analysis):
         self.analysis = analysis
         return self
-    
+
     def __eq__(self, other):
         return isinstance(other, VecAccess) and self.reglen == other.reglen and self.pointer == other.pointer and self.mrmap == other.mrmap and (self.horizontal == other.horizontal or self.isCompact and other.isCompact)
-    
+
     def __hash__(self):
         return hash((hash('mm256LoadGd'), self.pointer.mat, self.pointer.at, str(self.mrmap), self.orientation, self.isCompact))
 
 class mm256StoreGd(MovStatement):
     '''Wrapper of a vector store instruction.
-        
+
         Useful when we want to represent a composite store instruction as a single logical instruction and then have it
         easily replaced by a scalar during scalar replacement.
         '''
@@ -431,13 +431,13 @@ class mm256StoreGd(MovStatement):
         self.reglen = 4
         self.analysis = None
         self._content = None
-    
+
     @property
     def content(self):
         if self._content is None:
             self._content = self.generateContent()
         return self._content
-    
+
     def generateContent(self):
         dst = self.dst.pointer
         src = self.srcs[0]
@@ -445,7 +445,7 @@ class mm256StoreGd(MovStatement):
         horizontal = self.horizontal
         isCompact = self.isCompact
         content = None
-        
+
         if len(mrmap) == 1:
             if mrmap[0] == 0:
                 content = [ mmStoreSd(mm256CastPd256Pd128(src), dst) ]
@@ -461,13 +461,13 @@ class mm256StoreGd(MovStatement):
 #                     content = [asm256StoreuPd(src, dst)]
                 else:
                     vmask = self.reglen*[0]
-                    vmask[:l] = l*[1] 
+                    vmask[:l] = l*[1]
                     content = [mm256MaskstorePd(vmask, src, dst)]
             else: # Incompact case should appear only if vertical
                 content = []
                 vmask = [1] + 3*[0]
                 pcs = [ Pointer((dst.mat, (dst.at[0] + i, dst.at[1]))) for i in range(l) ]
-                if l == 2: 
+                if l == 2:
                     content.append( mm256MaskstorePd(vmask, src, pcs[0]) )
                     content.append( mm256MaskstorePd(vmask, mm256ShufflePd(src, src, [0,0,0,1]), pcs[1]) )
                 elif l==3:
@@ -497,7 +497,7 @@ class mm256StoreGd(MovStatement):
 #                 pointer2 = Pointer((dst.mat, (dst.at[0], dst.at[1] + 1)))
 #                 e1 = mmShufflePs(src, src, (1,1,1,1))
 #                 content = [mmStoreSsNoZeromask(e1, dst), mmStorehPi(src, PointerCast("__m64", pointer2))]
-        
+
         if content is None:
             raise ValueError('mm256StoreGd does not support mrmap %s with %s layout yet' % (str(mrmap), 'horizontal' if horizontal else 'vertical'))
 #         #DEBUG
@@ -510,7 +510,7 @@ class mm256StoreGd(MovStatement):
 #                 pi += 1
 #         #DEBUG
         return content
-    
+
     def replaceRefs(self, refMap):
         dst = self.dst.replaceRefs(refMap)
         src = self.srcs[0].replaceRefs(refMap)
@@ -519,21 +519,21 @@ class mm256StoreGd(MovStatement):
             self.srcs[0] = src
             return self
         return Mov(src, dst)
-    
+
     @staticmethod
     def canStore(reglen, mrmap, horizontal, isAligned=False):
         return reglen == 4
-    
+
     @staticmethod
     def getStore(src, dst):
         mrmap = dst.mrmap
         if isinstance(mrmap, int):
             mrmap = [mrmap]
         return mm256StoreGd(src, dst, mrmap, dst.isCompact, dst.isCorner, dst.horizontal)
-    
+
     def computeSym(self, nameList):
         return self.srcs[0].computeSym(nameList)[:len(self.mrmap)]
-    
+
     def unparse(self, indent):
         content = self.content
 #         if self.analysis is not None and isinstance(self.analysis, IntervalCongruenceReductionAnalysis):
@@ -542,11 +542,11 @@ class mm256StoreGd(MovStatement):
 #                 self.analysis.propagateEnvToSrcs(instr)
 #             content = [instr.align(self.analysis) for instr in content]
         return '\n'.join(instr.unparse(indent) for instr in content)
-    
+
     def printInst(self, indent):
 #         return 'mmStoreGs(%s, %s, %s)' % (str(self.mrmap), self.orientation, ','.join([instr.printInst(indent) for instr in self._content]))
         return 'mm256StoreGd(%r, %r, %r, %s, isCompact=%s)' % (self.dst, self.srcs[0], self.mrmap, self.orientation, str(self.isCompact))
-    
+
     def align(self, analysis):
         self.analysis = analysis
         return self
@@ -564,11 +564,11 @@ class mm256LoaduPd(RValue, VecAccess):
 
     def computeSym(self, nameList):
         p = self.pointer.computeSym(nameList)
-        return [ sympify(p+'_0'), sympify(p+'_1'), sympify(p+'_2'), sympify(p+'_3') ] 
+        return [ sympify(p+'_0'), sympify(p+'_1'), sympify(p+'_2'), sympify(p+'_3') ]
 
     def getZMask(self):
         return self.zeromask
-    
+
     def unparse(self, indent):
         return indent + "_mm256_loadu_pd(" + self.pointer.unparse("") + ")"
 
@@ -577,7 +577,7 @@ class mm256LoaduPd(RValue, VecAccess):
 
     def __eq__(self, other):
         return isinstance(other, mm256LoaduPd) and self.pointer == other.pointer
-    
+
     def __hash__(self):
         return hash((hash("mm256LoaduPd"), self.pointer.mat, self.pointer.at))
 
@@ -590,7 +590,7 @@ class asm256LoaduPd(mm256LoaduPd):
 
     def printInst(self, indent):
         return indent + "asm256LoaduPd( " + self.pointer.printInst("") + " )"
-    
+
     @staticmethod
     def add_func_defs():
         f =  "static __inline__ __m256d _asm256_loadu_pd(const double* p) {\n"
@@ -598,7 +598,7 @@ class asm256LoaduPd(mm256LoaduPd):
         f += "  __asm__(\"vmovupd %1, %0\" : \"=x\" (v) : \"m\" (*p));\n"
         f += "  return v;\n}\n"
         return [f]
-    
+
 class mm256MaskloadPd(RValue, VecAccess):
     def __init__(self, pointer, vecmask, zeromask=None):
         super(mm256MaskloadPd, self).__init__()
@@ -619,24 +619,24 @@ class mm256MaskloadPd(RValue, VecAccess):
         res = []
         for m,i in zip(self.vecmask,range(4)):
             res += [sympify(p+'_'+str(i))] if m else [sympify(0)]
-        return res 
+        return res
 
     def getZMask(self):
         return self.zeromask
-        
+
     def unparse(self, indent):
         vm = "_mm256_setr_epi64x("
         for m,i in zip(self.vecmask,range(4)):
             vm += "(__int64)1 << 63" if m else "0"
             vm += ", " if i<3 else ")"
         return indent + "_mm256_maskload_pd(" + self.pointer.unparse("") + ", " + vm + ")"
-    
+
     def printInst(self, indent):
         return indent + "mm256MaskloadPd( " + self.pointer.printInst("") + ", " + str(self.vecmask) + ")"
 
     def __eq__(self, other):
         return isinstance(other, mm256MaskloadPd) and self.vecmask == other.vecmask and self.pointer == other.pointer
-    
+
     def __hash__(self):
         return hash((hash("mm256MaskloadPd"), hash(tuple(self.vecmask)), self.pointer.mat, self.pointer.at))
 
@@ -652,20 +652,20 @@ class mm256BroadcastSd(RValue, VecAccess):
 
     def computeSym(self, nameList):
         p = self.pointer.computeSym(nameList)
-        return [ sympify(p+'_0'), sympify(p+'_0'), sympify(p+'_0'), sympify(p+'_0') ] 
+        return [ sympify(p+'_0'), sympify(p+'_0'), sympify(p+'_0'), sympify(p+'_0') ]
 
     def getZMask(self):
         return self.zeromask
-        
+
     def unparse(self, indent):
         return indent + "_mm256_broadcast_sd(" + self.pointer.unparse("") + ")"
-    
+
     def printInst(self, indent):
         return indent + "mm256BroadcastSd( " + self.pointer.printInst("") + " )"
 
     def __eq__(self, other):
         return isinstance(other, mm256BroadcastSd) and self.pointer == other.pointer
-    
+
     def __hash__(self):
         return hash((hash("mm256BroadcastSd"), self.pointer.mat, self.pointer.at))
 
@@ -677,7 +677,7 @@ class mm256StoreuPd(MovStatement):
         self.srcs += [ src ]
 #         self.slen = 4
 #         self.dlen = 4
-        
+
 
     def replaceRefs(self, refMap):
         dst = self.dst.replaceRefs(refMap)
@@ -698,11 +698,11 @@ class mm256StoreuPd(MovStatement):
         return mm256StoreuPd(src, dst)
 
     def computeSym(self, nameList):
-        return self.srcs[0].computeSym(nameList) 
-     
+        return self.srcs[0].computeSym(nameList)
+
     def unparse(self, indent):
         return indent + "_mm256_storeu_pd(" + self.dst.unparse("") + ", " + self.srcs[0].unparse("") + ");"
-    
+
     def printInst(self, indent):
         return indent + "mm256StoreuPd( " + self.srcs[0].printInst("") + ", " + self.dst.printInst("") + " )"
 
@@ -715,7 +715,7 @@ class asm256StoreuPd(mm256StoreuPd):
 
     def printInst(self, indent):
         return indent + "asm256StoreuPd( " + self.srcs[0].printInst("") + ", " + self.dst.printInst("") + " )"
-    
+
     @staticmethod
     def add_func_defs():
         f =  "static __inline__ void _asm256_storeu_pd(double* p, const __m256d& v) {\n"
@@ -728,10 +728,10 @@ class mm256MaskstorePd(MovStatement):
         self.mrmap = []
         for m,i in zip(vecmask,range(4)):
             self.mrmap += [i] if m else [-1]
-        self.dst = VecDest(dst, 4, self.mrmap) if isinstance(dst, Pointer) else VecDest(dst.pointer, 4, self.mrmap) 
+        self.dst = VecDest(dst, 4, self.mrmap) if isinstance(dst, Pointer) else VecDest(dst.pointer, 4, self.mrmap)
         self.srcs += [ src ]
         self.vecmask = vecmask
- 
+
     @staticmethod
     def canStore(reglen, mrmap, horizontal=True, isAligned=False):
         if not horizontal: return False
@@ -745,7 +745,7 @@ class mm256MaskstorePd(MovStatement):
         vecmask = [ (0 if r == -1 else 1) for r in dst.mrmap ]
         vecmask.extend([0 for _ in range(len(dst.mrmap), 4)])
         return mm256MaskstorePd(vecmask, src, dst)
-     
+
     def replaceRefs(self, refMap):
         dst = self.dst.replaceRefs(refMap)
         src = self.srcs[0].replaceRefs(refMap)
@@ -754,21 +754,21 @@ class mm256MaskstorePd(MovStatement):
             self.srcs[0] = src
             return self
         return Mov(src, dst)
-      
+
     def computeSym(self, nameList):
         src = self.srcs[0].computeSym(nameList)
         res = []
         for m,i in zip(self.vecmask,range(4)):
             res += [src[i]] if m else ["-"]
-        return res 
- 
+        return res
+
     def unparse(self, indent):
         vm = "_mm256_setr_epi64x("
         for m,i in zip(self.vecmask,range(4)):
             vm += "(__int64)1 << 63" if m else "0"
             vm += ", " if i<3 else ")"
         return indent + "_mm256_maskstore_pd(" + self.dst.unparse("") + ", " + vm + ", " + self.srcs[0].unparse("") + ");"
-     
+
     def printInst(self, indent):
         return indent + "mm256MaskstorePd( " + str(self.vecmask) + ", " + self.srcs[0].printInst("") + ", " + self.dst.printInst("") + " )"
 
@@ -779,15 +779,15 @@ class mm256Set1Pd(RValue):
 
     def computeSym(self, nameList):
         sym = self.srcs[0].computeSym(nameList)[0]
-        return [ sym, sym, sym, sym ] 
+        return [ sym, sym, sym, sym ]
 
     def getZMask(self):
         s0ZMask = self.srcs[0].getZMask()
         return [ s0ZMask[0], s0ZMask[0], s0ZMask[0], s0ZMask[0] ]
-    
+
     def unparse(self, indent):
         return indent + "_mm256_set1_pd(" + self.srcs[0].unparse("") + ")"
-    
+
     def printInst(self, indent):
         return indent + "mm256Set1Pd( " + self.srcs[0].printInst("") + " )"
 
@@ -797,7 +797,7 @@ class mm256SetPd(RValue):
         self.srcs += [ src0, src1, src2, src3 ]
 
     def computeSym(self, nameList):
-        return [ self.srcs[3].computeSym(nameList)[0], self.srcs[2].computeSym(nameList)[0], self.srcs[1].computeSym(nameList)[0], self.srcs[0].computeSym(nameList)[0] ] 
+        return [ self.srcs[3].computeSym(nameList)[0], self.srcs[2].computeSym(nameList)[0], self.srcs[1].computeSym(nameList)[0], self.srcs[0].computeSym(nameList)[0] ]
 
     def getZMask(self):
         s0ZMask = self.srcs[0].getZMask()
@@ -805,17 +805,17 @@ class mm256SetPd(RValue):
         s2ZMask = self.srcs[2].getZMask()
         s3ZMask = self.srcs[3].getZMask()
         return [ s3ZMask[0], s2ZMask[0], s1ZMask[0], s0ZMask[0] ]
-    
+
     def unparse(self, indent):
         return indent + "_mm256_set_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ", " + self.srcs[2].unparse("") + ", " + self.srcs[3].unparse("") + ")"
-    
+
     def printInst(self, indent):
         return indent + "mm256SetPd( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + self.srcs[2].printInst("") + ", " + self.srcs[3].printInst("") + " )"
 
 class mm256CastPd128Pd256(RValue):
     def __init__(self, src):
         super(mm256CastPd128Pd256, self).__init__()
-        self.srcs += [ src ] 
+        self.srcs += [ src ]
 
     def computeSym(self, nameList):
         src = self.srcs[0].computeSym(nameList)
@@ -823,7 +823,7 @@ class mm256CastPd128Pd256(RValue):
         return [ src[0], src[1], x, x ]
 
     def unparse(self, indent):
-        return indent + "_mm256_castpd128_pd256(" + self.srcs[0].unparse("") + ")" 
+        return indent + "_mm256_castpd128_pd256(" + self.srcs[0].unparse("") + ")"
 
     def printInst(self, indent):
         return indent + "mm256CastPd128Pd256( " + self.srcs[0].printInst("") + " )"
@@ -831,14 +831,14 @@ class mm256CastPd128Pd256(RValue):
 class mm256CastPd256Pd128(RValue):
     def __init__(self, src):
         super(mm256CastPd256Pd128, self).__init__()
-        self.srcs += [ src ] 
+        self.srcs += [ src ]
 
     def computeSym(self, nameList):
         src = self.srcs[0].computeSym(nameList)
         return [ src[0], src[1] ]
 
     def unparse(self, indent):
-        return indent + "_mm256_castpd256_pd128(" + self.srcs[0].unparse("") + ")" 
+        return indent + "_mm256_castpd256_pd128(" + self.srcs[0].unparse("") + ")"
 
     def printInst(self, indent):
         return indent + "mm256CastPd256Pd128( " + self.srcs[0].printInst("") + " )"
@@ -846,7 +846,7 @@ class mm256CastPd256Pd128(RValue):
 class mm256AddPd(RValue):
     def __init__(self, src0, src1):
         super(mm256AddPd, self).__init__()
-        self.srcs += [ src0, src1 ] 
+        self.srcs += [ src0, src1 ]
 
     def computeSym(self, nameList):
         src0 = self.srcs[0].computeSym(nameList)
@@ -854,7 +854,7 @@ class mm256AddPd(RValue):
         return [ src0[0] + src1[0], src0[1] + src1[1], src0[2] + src1[2], src0[3] + src1[3] ]
 
     def unparse(self, indent):
-        return indent + "_mm256_add_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")" 
+        return indent + "_mm256_add_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")"
 
     def printInst(self, indent):
         return indent + "mm256AddPd( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + " )"
@@ -862,7 +862,7 @@ class mm256AddPd(RValue):
 class mm256SubPd(RValue):
     def __init__(self, src0, src1):
         super(mm256SubPd, self).__init__()
-        self.srcs += [ src0, src1 ] 
+        self.srcs += [ src0, src1 ]
 
     def computeSym(self, nameList):
         src0 = self.srcs[0].computeSym(nameList)
@@ -870,7 +870,7 @@ class mm256SubPd(RValue):
         return [ src0[0] - src1[0], src0[1] - src1[1], src0[2] - src1[2], src0[3] - src1[3] ]
 
     def unparse(self, indent):
-        return indent + "_mm256_sub_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")" 
+        return indent + "_mm256_sub_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")"
 
     def printInst(self, indent):
         return indent + "mm256SubPd( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + " )"
@@ -878,7 +878,7 @@ class mm256SubPd(RValue):
 class mm256MulPd(RValue):
     def __init__(self, src0, src1):
         super(mm256MulPd, self).__init__()
-        self.srcs += [ src0, src1 ] 
+        self.srcs += [ src0, src1 ]
 
     def computeSym(self, nameList):
         src0 = self.srcs[0].computeSym(nameList)
@@ -886,15 +886,29 @@ class mm256MulPd(RValue):
         return [ src0[0] * src1[0], src0[1] * src1[1], src0[2] * src1[2], src0[3] * src1[3] ]
 
     def unparse(self, indent):
-        return indent + "_mm256_mul_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")" 
+        return indent + "_mm256_mul_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")"
 
     def printInst(self, indent):
         return indent + "mm256MulPd( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + " )"
 
+#adding code for the FMA instruction - again this is a RValue Statement
+class mm256FmaddPd(RValue):
+    def __init__(self,src0,src1,src2):
+        super(mm256FmaddPd,self).__init__()
+        self.srcs += [src0, src1, src2]
+    #ignoring the symbolic computation for now
+    #each src in the srcs list is probably an instruction/statement - so the argument to unparse is the indentation which is nothing
+
+    def unparse(self,indent):
+        return indent + "_mm256_fmadd_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ", " + self.srcs[2].unparse("") + " )"
+
+    def printInst(self,indent):
+        return indent + "mm256FmaddPd( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + ", " + self.srcs[2].printInst("") + " )"
+
 class mm256DivPd(RValue):
     def __init__(self, src0, src1):
         super(mm256DivPd, self).__init__()
-        self.srcs += [ src0, src1 ] 
+        self.srcs += [ src0, src1 ]
 
     def computeSym(self, nameList):
         src0 = self.srcs[0].computeSym(nameList)
@@ -902,7 +916,7 @@ class mm256DivPd(RValue):
         return [ src0[0] / src1[0], src0[1] / src1[1], src0[2] / src1[2], src0[3] / src1[3] ]
 
     def unparse(self, indent):
-        return indent + "_mm256_div_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")" 
+        return indent + "_mm256_div_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")"
 
     def printInst(self, indent):
         return indent + "mm256DivPd( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + " )"
@@ -910,10 +924,10 @@ class mm256DivPd(RValue):
 class mm256SqrtPd(RValue):
     def __init__(self, src):
         super(mm256SqrtPd, self).__init__()
-        self.srcs += [ src ] 
+        self.srcs += [ src ]
 
     def unparse(self, indent):
-        return indent + "_mm256_sqrt_pd(" + self.srcs[0].unparse("") + ")" 
+        return indent + "_mm256_sqrt_pd(" + self.srcs[0].unparse("") + ")"
 
     def printInst(self, indent):
         return indent + "mm256SqrtPd( " + self.srcs[0].printInst("") + " )"
@@ -927,9 +941,9 @@ class mm256HaddPd(RValue):
         src0 = self.srcs[0].computeSym(nameList)
         src1 = self.srcs[1].computeSym(nameList)
         return [ src0[0]+src0[1], src1[0]+src1[1], src0[2]+src0[3], src1[2]+src1[3] ]
-        
+
     def unparse(self, indent):
-        return indent + "_mm256_hadd_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")" 
+        return indent + "_mm256_hadd_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")"
 
     def printInst(self, indent):
         return indent + "mm256HaddPd( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + " )"
@@ -940,13 +954,13 @@ class mm256SetzeroPd(RValue):
 
     def computeSym(self, nameList):
         return [ sympify(0), sympify(0), sympify(0), sympify(0) ]
-        
+
     def unparse(self, indent):
-        return indent + "_mm256_setzero_pd()" 
+        return indent + "_mm256_setzero_pd()"
 
     def printInst(self, indent):
         return indent + "mm256SetzeroPd()"
- 
+
 class mm256Permute2f128Pd(RValue):
     def __init__(self, src0, src1, immBitList):
         super(mm256Permute2f128Pd, self).__init__()
@@ -955,7 +969,7 @@ class mm256Permute2f128Pd(RValue):
         imm = 0
         for bit in immBitList:
             imm = (imm << 1) | int(bit)
-        self.imm = imm 
+        self.imm = imm
 
     def select4(self, src0, src1, control, ifzero):
         imm = 0
@@ -971,20 +985,20 @@ class mm256Permute2f128Pd(RValue):
             return [src1[i] for i in range(2)]
         if imm == 3:
             return [src1[i] for i in range(2,4)]
-        
-        
+
+
     def computeSym(self, nameList): # To be fixed (more general)
         src0 = self.srcs[0].computeSym(nameList)
         src1 = self.srcs[1].computeSym(nameList)
-        return self.select4(src0, src1, self.immBitList[4:], sympify(0)) + self.select4(src1, src1, self.immBitList[:4], sympify(0)) # Is the def in Intrinsics guide buggy?? 
-    
+        return self.select4(src0, src1, self.immBitList[4:], sympify(0)) + self.select4(src1, src1, self.immBitList[:4], sympify(0)) # Is the def in Intrinsics guide buggy??
+
     def getZMask(self):
         s0ZMask = self.srcs[0].getZMask()
         s1ZMask = self.srcs[1].getZMask()
-        return self.select4(s0ZMask, s1ZMask, self.immBitList[4:], 1) + self.select4(s1ZMask, s1ZMask, self.immBitList[:4], 1) # Is the def in Intrinsics guide buggy?? 
-        
+        return self.select4(s0ZMask, s1ZMask, self.immBitList[4:], 1) + self.select4(s1ZMask, s1ZMask, self.immBitList[:4], 1) # Is the def in Intrinsics guide buggy??
+
     def unparse(self, indent):
-        return indent + "_mm256_permute2f128_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ", " + str(self.imm) + ")" 
+        return indent + "_mm256_permute2f128_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ", " + str(self.imm) + ")"
 
     def printInst(self, indent):
         return indent + "mm256Permute2f128Pd( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + ", " + str(self.immBitList) + " )"
@@ -997,18 +1011,18 @@ class mm256PermutePd(RValue):
         imm = 0
         for bit in immBitList:
             imm = (imm << 1) | int(bit)
-        self.imm = imm 
+        self.imm = imm
 
     def computeSym(self, nameList):
         src = self.srcs[0].computeSym(nameList)
-        return [ src[1] if self.immBitList[3] else src[0], src[1] if self.immBitList[2] else src[0], src[3] if self.immBitList[1] else src[2], src[3] if self.immBitList[0] else src[2] ] 
-    
+        return [ src[1] if self.immBitList[3] else src[0], src[1] if self.immBitList[2] else src[0], src[3] if self.immBitList[1] else src[2], src[3] if self.immBitList[0] else src[2] ]
+
     def getZMask(self):
         sZMask = self.srcs[0].getZMask()
-        return [ sZMask[1] if self.immBitList[3] else sZMask[0], sZMask[1] if self.immBitList[2] else sZMask[0], sZMask[3] if self.immBitList[1] else sZMask[2], sZMask[3] if self.immBitList[0] else sZMask[2] ] 
-        
+        return [ sZMask[1] if self.immBitList[3] else sZMask[0], sZMask[1] if self.immBitList[2] else sZMask[0], sZMask[3] if self.immBitList[1] else sZMask[2], sZMask[3] if self.immBitList[0] else sZMask[2] ]
+
     def unparse(self, indent):
-        return indent + "_mm256_permute_pd(" + self.srcs[0].unparse("") + ", " + str(self.imm) + ")" 
+        return indent + "_mm256_permute_pd(" + self.srcs[0].unparse("") + ", " + str(self.imm) + ")"
 
     def printInst(self, indent):
         return indent + "mm256PermutePd( " + self.srcs[0].printInst("") + ", " + str(self.immBitList) + " )"
@@ -1021,20 +1035,20 @@ class mm256ShufflePd(RValue):
         imm = 0
         for bit in immBitList:
             imm = (imm << 1) | int(bit)
-        self.imm = imm 
+        self.imm = imm
 
     def computeSym(self, nameList):
         src0 = self.srcs[0].computeSym(nameList)
         src1 = self.srcs[1].computeSym(nameList)
         return [ src0[self.immBitList[3]], src1[self.immBitList[2]], src0[2 + self.immBitList[1]], src1[2 + self.immBitList[0]] ]
-    
+
     def getZMask(self):
         s0ZMask = self.srcs[0].getZMask()
         s1ZMask = self.srcs[1].getZMask()
         return [ s0ZMask[self.immBitList[3]], s1ZMask[self.immBitList[2]], s0ZMask[2 + self.immBitList[1]], s1ZMask[2 + self.immBitList[0]] ]
 
     def unparse(self, indent):
-        return indent + "_mm256_shuffle_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ", " + str(self.imm) + ")" 
+        return indent + "_mm256_shuffle_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ", " + str(self.imm) + ")"
 
     def printInst(self, indent):
         return indent + "mm256ShufflePd( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + ", " + str(self.immBitList) + " )"
@@ -1055,7 +1069,7 @@ class mm256UnpackloPd(RValue):
         return [ s0ZMask[0], s1ZMask[0], s0ZMask[2], s1ZMask[2] ]
 
     def unparse(self, indent):
-        return indent + "_mm256_unpacklo_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")" 
+        return indent + "_mm256_unpacklo_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")"
 
     def printInst(self, indent):
         return indent + "mm256UnpackloPd( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + " )"
@@ -1076,7 +1090,7 @@ class mm256UnpackhiPd(RValue):
         return [ s0ZMask[1], s1ZMask[1], s0ZMask[3], s1ZMask[3] ]
 
     def unparse(self, indent):
-        return indent + "_mm256_unpackhi_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")" 
+        return indent + "_mm256_unpackhi_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")"
 
     def printInst(self, indent):
         return indent + "mm256UnpackhiPd( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + " )"
@@ -1089,7 +1103,7 @@ class mm256BlendPd(RValue):
         imm = 0
         for bit in immBitList:
             imm = (imm << 1) | int(bit)
-        self.imm = imm 
+        self.imm = imm
 
     def computeSym(self, nameList):
         e = 3
@@ -1104,7 +1118,7 @@ class mm256BlendPd(RValue):
         return [ s1ZMask[i] if self.immBitList[e-i] else s0ZMask[i] for i in range(e) ]
 
     def unparse(self, indent):
-        return indent + "_mm256_blend_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ", " + str(self.imm) + ")" 
+        return indent + "_mm256_blend_pd(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ", " + str(self.imm) + ")"
 
     def printInst(self, indent):
         return indent + "mm256BlendPd( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + ", " + str(self.immBitList) + " )"
@@ -1122,20 +1136,20 @@ class mm256LoaduPs(RValue, VecAccess):
 
     def computeSym(self, nameList):
         p = self.pointer.computeSym(nameList)
-        return [ sympify(p+'_'+str(i)) for i in range(self.reglen) ] 
+        return [ sympify(p+'_'+str(i)) for i in range(self.reglen) ]
 
     def getZMask(self):
         return self.zeromask
-    
+
     def unparse(self, indent):
         return indent + "_mm256_loadu_ps(" + self.pointer.unparse("") + ")"
-    
+
     def printInst(self, indent):
         return indent + "mm256LoaduPs( " + self.pointer.printInst("") + " )"
 
     def __eq__(self, other):
         return isinstance(other, mm256LoaduPs) and self.pointer == other.pointer
-    
+
     def __hash__(self):
         return hash((hash("mm256LoaduPs"), self.pointer.mat, self.pointer.at))
 
@@ -1159,24 +1173,24 @@ class mm256MaskloadPs(RValue, VecAccess):
         res = []
         for m,i in zip(self.vecmask,range(self.reglen)):
             res += [sympify(p+'_'+str(i))] if m else [sympify(0)]
-        return res 
+        return res
 
     def getZMask(self):
         return self.zeromask
-        
+
     def unparse(self, indent):
         vm = "_mm256_setr_epi32("
         for m,i in zip(self.vecmask,range(self.reglen)):
             vm += "(int)1 << 31" if m else "0"
             vm += ", " if i<7 else ")"
         return indent + "_mm256_maskload_ps(" + self.pointer.unparse("") + ", " + vm + ")"
-    
+
     def printInst(self, indent):
         return indent + "mm256MaskloadPs( " + self.pointer.printInst("") + ", " + str(self.vecmask) + ")"
 
     def __eq__(self, other):
         return isinstance(other, mm256MaskloadPs) and self.vecmask == other.vecmask and self.pointer == other.pointer
-    
+
     def __hash__(self):
         return hash((hash("mm256MaskloadPs"), hash(tuple(self.vecmask)), self.pointer.mat, self.pointer.at))
 
@@ -1192,20 +1206,20 @@ class mm256BroadcastSs(RValue, VecAccess):
 
     def computeSym(self, nameList):
         p = self.pointer.computeSym(nameList)
-        return [ sympify(p+'_0') ]*self.reglen 
+        return [ sympify(p+'_0') ]*self.reglen
 
     def getZMask(self):
         return self.zeromask
-        
+
     def unparse(self, indent):
         return indent + "_mm256_broadcast_ss(" + self.pointer.unparse("") + ")"
-    
+
     def printInst(self, indent):
         return indent + "mm256BroadcastSs( " + self.pointer.printInst("") + " )"
 
     def __eq__(self, other):
         return isinstance(other, mm256BroadcastSs) and self.pointer == other.pointer
-    
+
     def __hash__(self):
         return hash((hash("mm256BroadcastSs"), self.pointer.mat, self.pointer.at))
 
@@ -1215,7 +1229,7 @@ class mm256StoreuPs(MovStatement):
         super(mm256StoreuPs, self).__init__()
         self.dst = VecDest(dst, 8, self.mrmap) if isinstance(dst, Pointer) else VecDest(dst.pointer, 8, self.mrmap)
         self.srcs += [ src ]
-        
+
 
     def replaceRefs(self, refMap):
         dst = self.dst.replaceRefs(refMap)
@@ -1236,11 +1250,11 @@ class mm256StoreuPs(MovStatement):
         return mm256StoreuPs(src, dst)
 
     def computeSym(self, nameList):
-        return self.srcs[0].computeSym(nameList) 
-     
+        return self.srcs[0].computeSym(nameList)
+
     def unparse(self, indent):
         return indent + "_mm256_storeu_ps(" + self.dst.unparse("") + ", " + self.srcs[0].unparse("") + ");"
-    
+
     def printInst(self, indent):
         return indent + "mm256StoreuPs( " + self.srcs[0].printInst("") + ", " + self.dst.printInst("") + " )"
 
@@ -1250,10 +1264,10 @@ class mm256MaskstorePs(MovStatement):
         self.mrmap = []
         for m,i in zip(vecmask,range(8)):
             self.mrmap += [i] if m else [-1]
-        self.dst = VecDest(dst, 8, self.mrmap) if isinstance(dst, Pointer) else VecDest(dst.pointer, 8, self.mrmap) 
+        self.dst = VecDest(dst, 8, self.mrmap) if isinstance(dst, Pointer) else VecDest(dst.pointer, 8, self.mrmap)
         self.srcs += [ src ]
         self.vecmask = vecmask
- 
+
     @staticmethod
     def canStore(reglen, mrmap, horizontal=True, isAligned=False):
         if not horizontal: return False
@@ -1267,7 +1281,7 @@ class mm256MaskstorePs(MovStatement):
         vecmask = [ (0 if r == -1 else 1) for r in dst.mrmap ]
         vecmask.extend([0 for _ in range(len(dst.mrmap), 8)])
         return mm256MaskstorePs(vecmask, src, dst)
-     
+
     def replaceRefs(self, refMap):
         dst = self.dst.replaceRefs(refMap)
         src = self.srcs[0].replaceRefs(refMap)
@@ -1276,28 +1290,28 @@ class mm256MaskstorePs(MovStatement):
             self.srcs[0] = src
             return self
         return Mov(src, dst)
-      
+
     def computeSym(self, nameList):
         src = self.srcs[0].computeSym(nameList)
         res = []
         for m,i in zip(self.vecmask,range(4)):
             res += [src[i]] if m else ["-"]
-        return res 
- 
+        return res
+
     def unparse(self, indent):
         vm = "_mm256_setr_epi32("
         for m,i in zip(self.vecmask,range(8)):
             vm += "(int)1 << 31" if m else "0"
             vm += ", " if i<7 else ")"
         return indent + "_mm256_maskstore_ps(" + self.dst.unparse("") + ", " + vm + ", " + self.srcs[0].unparse("") + ");"
-     
+
     def printInst(self, indent):
         return indent + "mm256MaskstorePs( " + str(self.vecmask) + ", " + self.srcs[0].printInst("") + ", " + self.dst.printInst("") + " )"
 
 class mm256AddPs(RValue):
     def __init__(self, src0, src1):
         super(mm256AddPs, self).__init__()
-        self.srcs += [ src0, src1 ] 
+        self.srcs += [ src0, src1 ]
 
     def computeSym(self, nameList):
         src0 = self.srcs[0].computeSym(nameList)
@@ -1305,7 +1319,7 @@ class mm256AddPs(RValue):
         return [ src0[i] + src1[i] for i in range(8) ]
 
     def unparse(self, indent):
-        return indent + "_mm256_add_ps(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")" 
+        return indent + "_mm256_add_ps(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")"
 
     def printInst(self, indent):
         return indent + "mm256AddPs( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + " )"
@@ -1313,7 +1327,7 @@ class mm256AddPs(RValue):
 class mm256SubPs(RValue):
     def __init__(self, src0, src1):
         super(mm256SubPs, self).__init__()
-        self.srcs += [ src0, src1 ] 
+        self.srcs += [ src0, src1 ]
 
     def computeSym(self, nameList):
         src0 = self.srcs[0].computeSym(nameList)
@@ -1321,7 +1335,7 @@ class mm256SubPs(RValue):
         return [ src0[i] - src1[i] for i in range(8) ]
 
     def unparse(self, indent):
-        return indent + "_mm256_sub_ps(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")" 
+        return indent + "_mm256_sub_ps(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")"
 
     def printInst(self, indent):
         return indent + "mm256SubPs( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + " )"
@@ -1329,7 +1343,7 @@ class mm256SubPs(RValue):
 class mm256MulPs(RValue):
     def __init__(self, src0, src1):
         super(mm256MulPs, self).__init__()
-        self.srcs += [ src0, src1 ] 
+        self.srcs += [ src0, src1 ]
 
     def computeSym(self, nameList):
         src0 = self.srcs[0].computeSym(nameList)
@@ -1337,7 +1351,7 @@ class mm256MulPs(RValue):
         return [ src0[i] * src1[i] for i in range(8) ]
 
     def unparse(self, indent):
-        return indent + "_mm256_mul_ps(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")" 
+        return indent + "_mm256_mul_ps(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")"
 
     def printInst(self, indent):
         return indent + "mm256MulPs( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + " )"
@@ -1353,9 +1367,9 @@ class mm256HaddPs(RValue):
         lane0 = [ src0[0]+src0[1], src0[2]+src0[3], src1[0]+src1[1], src1[2]+src1[3] ]
         lane1 = [ src0[4]+src0[5], src0[6]+src0[7], src1[4]+src1[5], src1[6]+src1[7] ]
         return lane0 + lane1
-        
+
     def unparse(self, indent):
-        return indent + "_mm256_hadd_ps(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")" 
+        return indent + "_mm256_hadd_ps(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")"
 
     def printInst(self, indent):
         return indent + "mm256HaddPs( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + " )"
@@ -1368,7 +1382,7 @@ class mm256Permute2f128Ps(RValue):
         imm = 0
         for bit in immBitList:
             imm = (imm << 1) | int(bit)
-        self.imm = imm 
+        self.imm = imm
 
     def select4(self, src0, src1, control, ifzero):
         imm = 0
@@ -1384,20 +1398,20 @@ class mm256Permute2f128Ps(RValue):
             return [src1[i] for i in range(4)]
         if imm == 3:
             return [src1[i] for i in range(4,8)]
-        
-        
+
+
     def computeSym(self, nameList): # To be fixed (more general)
         src0 = self.srcs[0].computeSym(nameList)
         src1 = self.srcs[1].computeSym(nameList)
-        return self.select4(src0, src1, self.immBitList[4:], sympify(0)) + self.select4(src1, src1, self.immBitList[:4], sympify(0)) # Is the def in Intrinsics guide buggy?? 
-    
+        return self.select4(src0, src1, self.immBitList[4:], sympify(0)) + self.select4(src1, src1, self.immBitList[:4], sympify(0)) # Is the def in Intrinsics guide buggy??
+
     def getZMask(self):
         s0ZMask = self.srcs[0].getZMask()
         s1ZMask = self.srcs[1].getZMask()
-        return self.select4(s0ZMask, s1ZMask, self.immBitList[4:], 1) + self.select4(s1ZMask, s1ZMask, self.immBitList[:4], 1) # Is the def in Intrinsics guide buggy?? 
-        
+        return self.select4(s0ZMask, s1ZMask, self.immBitList[4:], 1) + self.select4(s1ZMask, s1ZMask, self.immBitList[:4], 1) # Is the def in Intrinsics guide buggy??
+
     def unparse(self, indent):
-        return indent + "_mm256_permute2f128_ps(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ", " + str(self.imm) + ")" 
+        return indent + "_mm256_permute2f128_ps(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ", " + str(self.imm) + ")"
 
     def printInst(self, indent):
         return indent + "mm256Permute2f128Ps( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + ", " + str(self.immBitList) + " )"
@@ -1422,7 +1436,7 @@ class mm256UnpackloPs(RValue):
         return lane0 + lane1
 
     def unparse(self, indent):
-        return indent + "_mm256_unpacklo_ps(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")" 
+        return indent + "_mm256_unpacklo_ps(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")"
 
     def printInst(self, indent):
         return indent + "mm256UnpackloPs( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + " )"
@@ -1447,7 +1461,7 @@ class mm256UnpackhiPs(RValue):
         return lane0 + lane1
 
     def unparse(self, indent):
-        return indent + "_mm256_unpackhi_ps(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")" 
+        return indent + "_mm256_unpackhi_ps(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ")"
 
     def printInst(self, indent):
         return indent + "mm256UnpackhiPs( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + " )"
@@ -1460,7 +1474,7 @@ class mm256BlendPs(RValue):
         imm = 0
         for bit in immBitList:
             imm = (imm << 1) | int(bit)
-        self.imm = imm 
+        self.imm = imm
 
     def computeSym(self, nameList):
         e = 7
@@ -1475,7 +1489,7 @@ class mm256BlendPs(RValue):
         return [ s1ZMask[i] if self.immBitList[e-i] else s0ZMask[i] for i in range(e) ]
 
     def unparse(self, indent):
-        return indent + "_mm256_blend_ps(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ", " + str(self.imm) + ")" 
+        return indent + "_mm256_blend_ps(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ", " + str(self.imm) + ")"
 
     def printInst(self, indent):
         return indent + "mm256BlendPs( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + ", " + str(self.immBitList) + " )"
@@ -1492,16 +1506,16 @@ class mm256ShufflePs(RValue):
         lane0 = [ src0[self.immTuple[3]], src0[self.immTuple[2]], src1[self.immTuple[1]], src1[self.immTuple[0]] ]
         lane1 = [ src0[4 + self.immTuple[3]], src0[4 + self.immTuple[2]], src1[4 + self.immTuple[1]], src1[4 + self.immTuple[0]] ]
         return lane0 + lane1
-    
+
     def getZMask(self):
         s0ZMask = self.srcs[0].getZMask()
         s1ZMask = self.srcs[1].getZMask()
         lane0 = [ s0ZMask[self.immTuple[3]], s0ZMask[self.immTuple[2]], s1ZMask[self.immTuple[1]], s1ZMask[self.immTuple[0]] ]
         lane1 = [ s0ZMask[4 + self.immTuple[3]], s0ZMask[4 + self.immTuple[2]], s1ZMask[4 + self.immTuple[1]], s1ZMask[4 + self.immTuple[0]] ]
         return lane0 + lane1
-        
+
     def unparse(self, indent):
-        return indent + "_mm256_shuffle_ps(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ", _MM_SHUFFLE" + str(self.immTuple) + ")" 
+        return indent + "_mm256_shuffle_ps(" + self.srcs[0].unparse("") + ", " + self.srcs[1].unparse("") + ", _MM_SHUFFLE" + str(self.immTuple) + ")"
 
     def printInst(self, indent):
         return indent + "mm256ShufflePs( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + ", " + str(self.immTuple) + " )"
@@ -1512,9 +1526,9 @@ class mm256SetzeroPs(RValue):
 
     def computeSym(self, nameList):
         return [ sympify(0) ]*8
-        
+
     def unparse(self, indent):
-        return indent + "_mm256_setzero_ps()" 
+        return indent + "_mm256_setzero_ps()"
 
     def printInst(self, indent):
         return indent + "mm256SetzeroPs()"
@@ -1522,7 +1536,7 @@ class mm256SetzeroPs(RValue):
 class _Dbl4Loader(Loader):
     def __init__(self):
         super(_Dbl4Loader, self).__init__()
-    
+
     def loadMatrix(self, mParams):
         src, dst = mParams['m'], mParams['nuM']
         sL, sR = mParams['mL'], mParams['mR']
@@ -1533,7 +1547,7 @@ class _Dbl4Loader(Loader):
         mStruct, mAccess = mParams['struct'], mParams['access']
         instructions = []
         nu = 4
-        
+
         instructions.append(Comment('AVX Loader:'))
         if Matrix.testGeneral(mStruct, mAccess, M, N):
 #         if (len(mStruct) == 1 and Matrix in mStruct) or (M!=N):
@@ -1712,15 +1726,15 @@ class _Dbl4Loader(Loader):
             comm = Comment('%dx%d -> 4x4 - %s' % (M, N, 'Identity'))
             instrs = [mm256StoreGd(v, pc, [0, 1, 2, 3]) for v, pc in zip(vs, pcs)]
             instructions.extend([comm] + instrs)
-                        
+
         return instructions
 
 class _Dbl4BLAC(object):
     def __init__(self):
         super(_Dbl4BLAC, self).__init__()
-    
+
     def Zero(self, dParams, opts):
-        
+
         nu = 4
         dst = dParams['nuM']
         dL, dR   = dParams['nuML'], dParams['nuMR']
@@ -1737,11 +1751,11 @@ class _Dbl4BLAC(object):
                 pc = Pointer(dst[dL.of(i),dR.of(0)])
                 instr = mm256StoreGd(mm256SetzeroPd(), pc, range(nu))
                 instructions += [ instr ]
-        
+
         return instructions
 
     def Copy(self, sParams, dParams, opts):
-        
+
         nu = 4
         # these are the 3 Matrix objects involved
         src, dst = sParams['nuM'], dParams['nuM']
@@ -1763,13 +1777,13 @@ class _Dbl4BLAC(object):
             pcs = [Pointer(dst[dL.of(i),dR.of(0)]) for i in range(4)]
             instrs = [mm256StoreGd(va, pc, [0, 1, 2, 3]) for va, pc in zip(vas, pcs)]
             instructions.extend(instrs)
-        
+
         for i in instructions:
-            i.bounds.update(dParams['bounds'])                
+            i.bounds.update(dParams['bounds'])
         return instructions
-    
+
     def Add(self, s0Params, s1Params, dParams, opts):
-        
+
         nu = 4
         src0, src1, dst = s0Params['nuM'], s1Params['nuM'], dParams['nuM']
         s0L, s0R = s0Params['nuML'], s0Params['nuMR']
@@ -1792,11 +1806,11 @@ class _Dbl4BLAC(object):
                 pc = Pointer(dst[dL.of(i),dR.of(0)])
                 instr = mm256StoreGd(mm256AddPd(va, vb), pc, range(nu))
                 instructions += [ instr ]
-        
+
         return instructions
 
     def Neg(self, sParams, dParams, opts):
-        
+
         nu = 4
         src, dst = sParams['nuM'], dParams['nuM']
         sL, sR = sParams['nuML'], sParams['nuMR']
@@ -1820,7 +1834,7 @@ class _Dbl4BLAC(object):
         return instructions
 
     def Sub(self, s0Params, s1Params, dParams, opts):
-        
+
         nu = 4
         src0, src1, dst = s0Params['nuM'], s1Params['nuM'], dParams['nuM']
         s0L, s0R = s0Params['nuML'], s0Params['nuMR']
@@ -1843,11 +1857,11 @@ class _Dbl4BLAC(object):
                 pc = Pointer(dst[dL.of(i),dR.of(0)])
                 instr = mm256StoreGd(mm256SubPd(va, vb), pc, range(nu))
                 instructions += [ instr ]
-        
+
         return instructions
 
     def _Div(self, s0Params, s1Params, dParams, opts):
-        
+
         nu = 4
         src0, src1, dst = s0Params['nuM'], s1Params['nuM'], dParams['nuM']
         s0L, s0R = s0Params['nuML'], s0Params['nuMR']
@@ -1863,11 +1877,11 @@ class _Dbl4BLAC(object):
 #         instr = mm256StoreGd(mm256DivPd(va, vb), pc, range(nu))
         instr = mm256StoreGd(mm256CastPd128Pd256(mmDivPd(mm256CastPd256Pd128(va), mm256CastPd256Pd128(vb))), pc, range(nu))
         instructions += [ instr ]
-        
+
         return instructions
 
     def _Sqrt(self, sParams, dParams, opts):
-        
+
         nu = 4
         src, dst = sParams['nuM'], dParams['nuM']
         sL, sR = sParams['nuML'], sParams['nuMR']
@@ -1881,7 +1895,7 @@ class _Dbl4BLAC(object):
 #         instr = mm256StoreGd(mm256SqrtPd(va), pc, range(nu))
         instr = mm256StoreGd(mm256CastPd128Pd256(mmSqrtPd(mm256CastPd256Pd128(va))), pc, range(nu))
         instructions += [ instr ]
-        
+
         return instructions
 
 #     def LDiv(self, s0Params, s1Params, dParams, opts):
@@ -1893,7 +1907,7 @@ class _Dbl4BLAC(object):
 #         oN, M, N = s1Params['N'], s0Params['nuMM'], s1Params['nuMN']
 #         s0Struct = s0Params['struct']
 #         instructions = []
-# 
+#
 #         instructions += [ Comment(str(nu) + "-BLAC: " + str(M) + "x" + str(M) + " \ " + str(M) + "x" + str(N)) ]
 #         if M == 1:
 #             va0 = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0)]), range(nu))
@@ -1985,7 +1999,7 @@ class _Dbl4BLAC(object):
 #                     x2 = mm256LoadGd(pcs[2], range(nu))
 #                     sol = mm256MulPd(rdiags[3], mm256SubPd(mm256SubPd(mm256SubPd(vbs[3], mm256MulPd(bca30, x0)), mm256MulPd(bca31, x1)), mm256MulPd(bca32, x2)))
 #                     instructions += [ mm256StoreGd(sol, pcs[3], range(nu)) ]
-#             else: 
+#             else:
 #                 if N == 1: #trsv backward-sub
 #                     va0 = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0)]), range(nu))
 #                     va1 = mm256LoadGd(Pointer(src0[s0L.of(1),s0R.of(0)]), range(nu))
@@ -2064,9 +2078,9 @@ class _Dbl4BLAC(object):
 #                     x1 = mm256LoadGd(pcs[1], range(nu))
 #                     sol = mm256MulPd(rdiags[0], mm256SubPd(mm256SubPd(mm256SubPd(vbs[0], mm256MulPd(bca01, x1)), mm256MulPd(bca02, x2)), mm256MulPd(bca03, x3)))
 #                     instructions += [ mm256StoreGd(sol, pcs[0], range(nu)) ]
-# 
+#
 #         return instructions
-        
+
     def Mul(self, s0Params, s1Params, dParams, opts):
 
         nu = 4
@@ -2080,6 +2094,7 @@ class _Dbl4BLAC(object):
         instructions += [ Comment(str(nu) + "-BLAC: " + str(M) + "x" + str(K) + " * " + str(K) + "x" + str(N)) ]
         if M == 1:
             if N == 1:
+                #this is the case of inner product
                 va = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0)]), range(nu))
                 vb = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0)]), range(nu))
                 pc = Pointer(dst[dL.of(0),dR.of(0)])
@@ -2092,6 +2107,29 @@ class _Dbl4BLAC(object):
                 instr = mm256StoreGd(vadd1, pc, range(nu))
                 instructions += [ instr ]
             else:
+                #this is the case of vector-matrix multiplication
+                #FMADD
+                vb0 = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0)]), range(nu))
+                vb1 = mm256LoadGd(Pointer(src1[s1L.of(1),s1R.of(0)]), range(nu))
+                vb2 = mm256LoadGd(Pointer(src1[s1L.of(2),s1R.of(0)]), range(nu))
+                vb3 = mm256LoadGd(Pointer(src1[s1L.of(3),s1R.of(0)]), range(nu))
+
+                va00 = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0)]), [tuple(range(nu))])
+                va01 = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(1)]), [tuple(range(nu))])
+                va02 = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(2)]), [tuple(range(nu))])
+                va03 = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(3)]), [tuple(range(nu))])
+
+                pc = Pointer(dst[dL.of(0),dR.of(0)])
+                res = mm256LoadGd(pc, range(nu))
+
+                res = mm256FmaddPd(va00,vb0,res)
+                res = mm256FmaddPd(va01,vb1,res)
+                res = mm256FmaddPd(va02,vb2,res)
+                res = mm256FmaddPd(va03,vb3,res)
+
+                instr = mm256StoreGd(res, pc , range(nu))
+                instructions += [ instr ]
+                '''
                 vb0 = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0)]), range(nu))
                 vb1 = mm256LoadGd(Pointer(src1[s1L.of(1),s1R.of(0)]), range(nu))
                 vb2 = mm256LoadGd(Pointer(src1[s1L.of(2),s1R.of(0)]), range(nu))
@@ -2110,8 +2148,10 @@ class _Dbl4BLAC(object):
                 pc = Pointer(dst[dL.of(0),dR.of(0)])
                 instr = mm256StoreGd(mm256AddPd(add0, add1), pc, range(nu))
                 instructions += [ instr ]
+                '''
         else:
             if K == 1:
+                #this is the case of an outer-product
                 va0 = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0)]), [tuple(range(nu))])
                 va1 = mm256LoadGd(Pointer(src0[s0L.of(1),s0R.of(0)]), [tuple(range(nu))])
                 va2 = mm256LoadGd(Pointer(src0[s0L.of(2),s0R.of(0)]), [tuple(range(nu))])
@@ -2128,6 +2168,7 @@ class _Dbl4BLAC(object):
                 instructions += [ instr0, instr1, instr2, instr3 ]
             else:
                 if N == 1:
+                    #this is the case of a matrix-vector product
                     va0 = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0)]), range(nu))
                     va1 = mm256LoadGd(Pointer(src0[s0L.of(1),s0R.of(0)]), range(nu))
                     va2 = mm256LoadGd(Pointer(src0[s0L.of(2),s0R.of(0)]), range(nu))
@@ -2145,25 +2186,52 @@ class _Dbl4BLAC(object):
                     instr = mm256StoreGd(mm256AddPd(vper, vble), pc, range(nu))
                     instructions += [ instr ]
                 else:
+                    #this is the general matrix-matrix multiplication case - nu x nu matrices
+                    #matrices are represented row-major order
+                    #FMADD goes here
+
                     vb0 = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0)]), range(nu))
                     vb1 = mm256LoadGd(Pointer(src1[s1L.of(1),s1R.of(0)]), range(nu))
                     vb2 = mm256LoadGd(Pointer(src1[s1L.of(2),s1R.of(0)]), range(nu))
                     vb3 = mm256LoadGd(Pointer(src1[s1L.of(3),s1R.of(0)]), range(nu))
                     for i in range(nu):
-                        vai0 = mm256LoadGd(Pointer(src0[s0L.of(i),s0R.of(0)]), [tuple(range(nu))])
-                        vai1 = mm256LoadGd(Pointer(src0[s0L.of(i),s0R.of(1)]), [tuple(range(nu))])
-                        vai2 = mm256LoadGd(Pointer(src0[s0L.of(i),s0R.of(2)]), [tuple(range(nu))])
-                        vai3 = mm256LoadGd(Pointer(src0[s0L.of(i),s0R.of(3)]), [tuple(range(nu))])
-                        mul0 = mm256MulPd(vai0, vb0)
-                        mul1 = mm256MulPd(vai1, vb1)
-                        add0 = mm256AddPd(mul0, mul1)
+                        pc = Pointer(dst[dL.of(i),dR.of(0)])
+                        res = mm256LoadGd(pc, range(nu))
+
+                        vai0 = mm256LoadGd(Pointer(src0[s0L.of(i),s0R.of(0)]), [tuple(range(nu))]) # broadcasting element 0 in row i
+                        vai1 = mm256LoadGd(Pointer(src0[s0L.of(i),s0R.of(1)]), [tuple(range(nu))]) # broadcasting element 1 in row i
+                        vai2 = mm256LoadGd(Pointer(src0[s0L.of(i),s0R.of(2)]), [tuple(range(nu))]) # broadcasting element 2 in row i
+                        vai3 = mm256LoadGd(Pointer(src0[s0L.of(i),s0R.of(3)]), [tuple(range(nu))]) # broadcasting element 3 in row i
+
+                        res = mm256FmaddPd(vai0,vb0,res)
+                        res = mm256FmaddPd(vai1,vb1,res)
+                        res = mm256FmaddPd(vai2,vb2,res)
+                        res = mm256FmaddPd(vai3,vb3,res)
+
+                        instr = mm256StoreGd(res, pc, range(nu))
+                        instructions += [ instr ]
+                        print('########################')
+                        print('DEBUG STATEMENT: Type of instr = {} '.format(type(instr)))
+                    '''
+                    vb0 = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0)]), range(nu)) #loads the vector at src1[0,0]
+                    vb1 = mm256LoadGd(Pointer(src1[s1L.of(1),s1R.of(0)]), range(nu)) #loads the vector at src1[1,0]
+                    vb2 = mm256LoadGd(Pointer(src1[s1L.of(2),s1R.of(0)]), range(nu)) #loads the vector at src1[2,0]
+                    vb3 = mm256LoadGd(Pointer(src1[s1L.of(3),s1R.of(0)]), range(nu)) #loads the vector at src2[3,0]
+                    for i in range(nu): #iterates over each row from 0 to nu
+                        vai0 = mm256LoadGd(Pointer(src0[s0L.of(i),s0R.of(0)]), [tuple(range(nu))]) # broadcasting element 0 in row i
+                        vai1 = mm256LoadGd(Pointer(src0[s0L.of(i),s0R.of(1)]), [tuple(range(nu))]) # broadcasting element 1 in row i
+                        vai2 = mm256LoadGd(Pointer(src0[s0L.of(i),s0R.of(2)]), [tuple(range(nu))]) # broadcasting element 2 in row i
+                        vai3 = mm256LoadGd(Pointer(src0[s0L.of(i),s0R.of(3)]), [tuple(range(nu))]) # broadcasting element 3 in row i
+                        mul0 = mm256MulPd(vai0, vb0) # multiplying src0[i,0] with vector at src1[0,0]
+                        mul1 = mm256MulPd(vai1, vb1) # multiplying src0[i,1] with vector at src1[1,0]
+                        add0 = mm256AddPd(mul0, mul1) # adding the two previous computations into the corresponding row - in this case its row i in the result
                         mul2 = mm256MulPd(vai2, vb2)
                         mul3 = mm256MulPd(vai3, vb3)
-                        add1 = mm256AddPd(mul2, mul3)
-                        pc = Pointer(dst[dL.of(i),dR.of(0)])
-                        instr = mm256StoreGd(mm256AddPd(add0, add1), pc, range(nu))
-                        instructions += [ instr ]
-
+                        add1 = mm256AddPd(mul2, mul3) # as done previously, adding the result into row i of the result matrix
+                        pc = Pointer(dst[dL.of(i),dR.of(0)]) # pointer to row i in the result matrix
+                        instr = mm256StoreGd(mm256AddPd(add0, add1), pc, range(nu)) # storing the computation back into the address held by the pointer
+                        instructions += [ instr ] # adding the instruction to the instruction sequence
+                    '''
         return instructions
 
     def Kro(self, s0Params, s1Params, dParams, opts):
@@ -2176,7 +2244,7 @@ class _Dbl4BLAC(object):
         oM, oK, oN, oP = s0Params['M'], s0Params['N'], s1Params['M'], s1Params['N']
         M, K, N, P = s0Params['nuMM'], s0Params['nuMN'], s1Params['nuMM'], s1Params['nuMN']
         instructions = []
-        
+
         instructions += [ Comment(str(nu) + "-BLAC: " + str(M) + "x" + str(K) + " Kro " + str(N) + "x" + str(P)) ]
         if oM*oK*oN*oP == 1:
             pc = Pointer(dst[dL.of(0),dR.of(0)])
@@ -2191,7 +2259,7 @@ class _Dbl4BLAC(object):
                 va = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0)]), range(nu))
                 repva = mm256Permute2f128Pd(va, va, [0,0,0,0,0,0,0,0]) #Need to replicate on the 2nd lane
                 dup = mm256ShufflePd(repva, repva, (0,0,0,0))
-                
+
             if N*P == nu:
                 vb = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0)]), range(nu))
                 pc = Pointer(dst[dL.of(0),dR.of(0)])
@@ -2213,7 +2281,7 @@ class _Dbl4BLAC(object):
                 vb = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0)]), range(nu))
                 repvb = mm256Permute2f128Pd(vb, vb, [0,0,0,0,0,0,0,0]) #Need to replicate on the 2nd lane
                 dup = mm256ShufflePd(repvb, repvb, (0,0,0,0))
-            
+
             if M*K == nu:
                 va = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0)]), range(nu))
                 pc = Pointer(dst[dL.of(0),dR.of(0)])
@@ -2228,7 +2296,7 @@ class _Dbl4BLAC(object):
                     pc = Pointer(dst[dL.of(i),dR.of(0)])
                     instr = mm256StoreGd(mm256MulPd(va, dup), pc, range(nu))
                     instructions += [ instr ]
-        
+
         return instructions
 
     def T(self, sParams, dParams, opts):
@@ -2270,7 +2338,7 @@ class _Dbl4BLAC(object):
             instr2 = mm256StoreGd(col2, pc2, range(nu))
             instr3 = mm256StoreGd(col3, pc3, range(nu))
             instructions += [ instr0, instr1, instr2, instr3 ]
-        
+
         return instructions
 
 class _Dbl4Storer(Storer):
@@ -2288,7 +2356,7 @@ class _Dbl4Storer(Storer):
         nu = 4
 
         instructions.append(Comment('AVX Storer:'))
-        if Matrix.testGeneral(mStruct, mAccess, M, N):        
+        if Matrix.testGeneral(mStruct, mAccess, M, N):
             if M == 1 and N == 1:
                 pc = AddressOf(sa(dst[dL.of(0),dR.of(0)]))
                 va = mm256LoadGd(Pointer(src[sL.of(0),sR.of(0)]), range(nu))
@@ -2298,7 +2366,7 @@ class _Dbl4Storer(Storer):
                 va = mm256LoadGd(Pointer(src[sL.of(0),sR.of(0)]), range(nu))
                 pc = Pointer(dst[dL.of(0),dR.of(0)])
                 horizontal = M==1
-                instr = mm256StoreGd(va, pc, range(max(M,N)), isCompact=isCompact, horizontal=horizontal)            
+                instr = mm256StoreGd(va, pc, range(max(M,N)), isCompact=isCompact, horizontal=horizontal)
                 instructions += [ instr ]
             elif mAccess.intersect(Map("{[i,j]->[i,j]}")) == mAccess and ((M < nu and N < nu) or (M == nu and N > 1 and N < nu) or (M > 1 and M < nu and N == nu)):
                 pcs = [ Pointer(dst[dL.of(i),dR.of(0)]) for i in range(M) ]
@@ -2326,7 +2394,7 @@ class _Dbl4Storer(Storer):
 #             if Matrix in mStruct and ZeroMatrix in mStruct and M==N:
 #                 if mStruct[Matrix] == Set("{[i,j]: 0<=i<"+str(M)+" and 0<=j<=i}") and mStruct[ZeroMatrix] == Set("{[i,j]: 0<=i<"+str(M)+" and i<j<"+str(M)+"}"):
         elif LowerTriangular.test(mStruct, mAccess, M, N):
-            #LowerTriang 
+            #LowerTriang
             nuvs = [mm256LoadGd(Pointer(src[sL.of(i),sR.of(0)]), [0, 1, 2, 3], isCompact, zeromask=range(i+1, 4)) for i in range(M)]
             pcs = [Pointer(dst[dL.of(i),dR.of(0)]) for i in range(M)]
             comm = Comment("4x4 -> %dx%d - %s" % (M, N, 'LowTriang'))
@@ -2334,7 +2402,7 @@ class _Dbl4Storer(Storer):
             instructions.extend([comm] + instrs)
         elif UpperTriangular.test(mStruct, mAccess, M, N):
 #                 elif mStruct[Matrix] == Set("{[i,j]: 0<=i<"+str(M)+" and i<=j<"+str(M)+"}") and mStruct[ZeroMatrix] == Set("{[i,j]: 0<=i<"+str(M)+" and 0<=j<i}"):
-            #UpperTriang 
+            #UpperTriang
             nuvs = [mm256LoadGd(Pointer(src[sL.of(i),sR.of(0)]), [0, 1, 2, 3], isCompact, zeromask=range(0, i)) for i in range(M)]
             pcs = [Pointer(dst[dL.of(i),dR.of(i)]) for i in range(M)]
 #                     pcs = [Pointer(dst[dL.of(i),dR.of(0)]) for i in range(M)]
@@ -2342,10 +2410,10 @@ class _Dbl4Storer(Storer):
             instrs = [mm256StoreGd(nuvs[i], pcs[i], range(i,M), isCompact) for i in range(M)]
             instructions.extend([comm] + instrs)
 #        elif (len(mStruct) == 1 and Matrix in mStruct) or (M!=N):
-        
+
         for i in instructions:
             i.bounds.update(mParams['bounds'])
-        
+
 #         if M == 1:
 #             if N < 4:
 #                 pc = AddressOf(sa(dst[dL.of(0),dR.of(0)])) if N == 1 else Pointer(dst[dL.of(0),dR.of(0)])
@@ -2479,9 +2547,9 @@ class _Dbl4Storer(Storer):
 class _Flt8Loader(Loader):
     def __init__(self):
         super(_Flt8Loader, self).__init__()
-    
+
     def loadMatrix(self, mParams):
-        
+
         nu=8
         src, dst = mParams['m'], mParams['nuM']
         sL, sR = mParams['mL'], mParams['mR']
@@ -2490,7 +2558,7 @@ class _Flt8Loader(Loader):
         nuMM, nuMN = mParams['nuMM'], mParams['nuMN']
         isCompact = mParams['compact']
         instructions = [ ]
-        
+
         if M == 1 and N == 1:
             pc = Pointer(dst[dL.of(0),dR.of(0)])
 #             vmask = [1] + 7*[0]
@@ -2511,7 +2579,7 @@ class _Flt8Loader(Loader):
 #             else: # Incompact case should appear only for M>1 and N==1
 #                 vmask = [1] + 7*[0]
 #                 es = [ mm256MaskloadPs(Pointer(src[sL.of(i),sR.of(0)]), vmask) for i in range(M) ]
-#                 if M == 2: 
+#                 if M == 2:
 #                     instr = mm256StoreuPs(mm256UnpackloPs(es[0], es[1]), pc)
 #                 elif M==3:
 #                     t0 = mm256UnpackloPs(es[0], es[1])
@@ -2555,7 +2623,7 @@ class _Flt8Loader(Loader):
             instructions += [ Comment(str(M) + "x" + str(N) + " -> " + str(nuMM) + "x" + str(nuMN)) ]
             instructions += [ mm256StoreGs(vas[i], pcs[i], range(nu)) for i in range(M) ]
             instructions += [ mm256StoreGs(mm256SetzeroPs(), pcs[i], range(nu)) for i in range(M,nu) ]
-                
+
         return instructions
 
 class _Flt8BLAC(object):
@@ -2563,7 +2631,7 @@ class _Flt8BLAC(object):
         super(_Flt8BLAC, self).__init__()
 
     def Add(self, s0Params, s1Params, dParams, opts):
-        
+
         nu = 8
         src0, src1, dst = s0Params['nuM'], s1Params['nuM'], dParams['nuM']
         s0L, s0R = s0Params['nuML'], s0Params['nuMR']
@@ -2586,7 +2654,7 @@ class _Flt8BLAC(object):
                 pc = Pointer(dst[dL.of(i),dR.of(0)])
                 instr = mm256StoreGs(mm256AddPs(va, vb), pc, range(nu))
                 instructions += [ instr ]
-        
+
         return instructions
 
     def Mul(self, s0Params, s1Params, dParams, opts):
@@ -2618,7 +2686,7 @@ class _Flt8BLAC(object):
             else:
                 vbs = [ mm256LoadGs(Pointer(src1[s1L.of(i),s1R.of(0)]), range(nu)) for i in range(nu) ]
                 va0s = [ mm256LoadGs(Pointer(src0[s0L.of(0),s0R.of(i)]), [tuple(range(nu))]) for i in range(nu) ]
-                
+
                 adds = []
                 for i in range(0,nu,2):
                     mul0 = mm256MulPs(va0s[i], vbs[i])
@@ -2675,7 +2743,7 @@ class _Flt8BLAC(object):
         oM, oK, oN, oP = s0Params['M'], s0Params['N'], s1Params['M'], s1Params['N']
         M, K, N, P = s0Params['nuMM'], s0Params['nuMN'], s1Params['nuMM'], s1Params['nuMN']
         instructions = []
-        
+
         instructions += [ Comment(str(nu) + "-BLAC: " + str(M) + "x" + str(K) + " Kro " + str(N) + "x" + str(P)) ]
         if oM*oK*oN*oP == 1:
             pc = Pointer(dst[dL.of(0),dR.of(0)])
@@ -2727,7 +2795,7 @@ class _Flt8BLAC(object):
                     pc = Pointer(dst[dL.of(i),dR.of(0)])
                     instr = mm256StoreGs(mm256MulPs(va, dup), pc, range(nu))
                     instructions += [ instr ]
-        
+
         return instructions
 
     def T(self, sParams, dParams, opts):
@@ -2750,7 +2818,7 @@ class _Flt8BLAC(object):
 
             unplos = [ mm256UnpackloPs(vas[i], vas[i+1]) for i in range(0,nu,2) ]
             unphis = [ mm256UnpackhiPs(vas[i], vas[i+1]) for i in range(0,nu,2) ]
-            
+
             trow0 = mm256ShufflePs(unplos[0], unplos[1], (1,0,1,0))
             trow1 = mm256ShufflePs(unplos[0], unplos[1], (3,2,3,2))
             trow2 = mm256ShufflePs(unphis[0], unphis[1], (1,0,1,0))
@@ -2771,7 +2839,7 @@ class _Flt8BLAC(object):
 
             pcs = [ Pointer(dst[dL.of(i),dR.of(0)]) for i in range(nu) ]
             instructions += [ mm256StoreGs(newrows[i], pcs[i], range(nu)) for i in range(nu) ]
-        
+
         return instructions
 
 class _Flt8Storer(Storer):
@@ -2797,7 +2865,7 @@ class _Flt8Storer(Storer):
             va = mm256LoadGs(Pointer(src[sL.of(0),sR.of(0)]), range(nu))
             pc = Pointer(dst[dL.of(0),dR.of(0)])
             horizontal = M==1
-            instr = mm256StoreGs(va, pc, range(max(M,N)), isCompact=isCompact, horizontal=horizontal)            
+            instr = mm256StoreGs(va, pc, range(max(M,N)), isCompact=isCompact, horizontal=horizontal)
 #             if isCompact:
 #                 pc = Pointer(dst[dL.of(0),dR.of(0)])
 #                 if max(M,N) < nu:
@@ -2809,7 +2877,7 @@ class _Flt8Storer(Storer):
 #                 vmask = [1] + 7*[0]
 #                 pcs = [ Pointer(dst[dL.of(i),dR.of(0)]) for i in range(M) ]
 #                 instrs = []
-#                 if M == 2: 
+#                 if M == 2:
 #                     instrs.append( mm256MaskstorePs(vmask, va, pcs[0]) )
 #                     instrs.append( mm256MaskstorePs(vmask, mm256ShufflePs(va, va, (2,2,2,1)), pcs[1]) )
 #                 elif M==3:
@@ -2865,7 +2933,7 @@ class _Flt8Storer(Storer):
 #             else:
             instrs = [ mm256StoreGs(vas[i], pcs[i], range(N)) for i in range(M) ]
             instructions += instrs
-                
+
         return instructions
 
 class AVXLoadReplacer(LoadReplacer):
@@ -2878,7 +2946,7 @@ class AVXLoadReplacer(LoadReplacer):
         if dst.reglen == 4 and dst.mrmap == [0,1,2,3]:
 #             at = src.pointer.getAt()
 #             direct = 1 if src.pointer.getMat().size[1] > 1 else 0   # Temp solution
-#             lane1, posInLane = at[direct] > 1, at[direct] % 2  
+#             lane1, posInLane = at[direct] > 1, at[direct] % 2
 #             immBitList = [0,0,1,1,0,0,0,1] if lane1 else [0,0,1,0,0,0,0,0]
 #             dupLane = mm256Permute2f128Pd(mm256LoaduPd(dst.pointer), mm256LoaduPd(dst.pointer), immBitList) # Dup the lane where we can find the value
 #             return mm256ShufflePd(dupLane, dupLane, [posInLane]*4)
@@ -2886,14 +2954,14 @@ class AVXLoadReplacer(LoadReplacer):
             return mm256Permute2f128Pd(dupx2, dupx2, [0,0,1,0,0,0,0,0]) # Dup first lane
 
     def mm256LoadGd(self, src, repList, bounds):
-        #src is the mm256LoadGd we want to replace with combinations of elements from previous stores in repList 
+        #src is the mm256LoadGd we want to replace with combinations of elements from previous stores in repList
 #         if src.pointer._ref.physLayout.name == 'C' and src.pointer.at == (0,8) and src.mrmap == [0]:
 #             pass
         list_by_line = sorted(repList, key=lambda t: t[0], reverse=True)
         dsts_by_line = [ t[1] for t in list_by_line ]
         src_dsts_map = self.src_dsts_map(src, dsts_by_line)
         if len(src_dsts_map) > 1:
-            dsts = [ t[2] for t in src_dsts_map ] 
+            dsts = [ t[2] for t in src_dsts_map ]
             if len(src_dsts_map) == 4 and all([ t[:2] == p for t,p in zip(src_dsts_map,[([0],[0]),([1],[0]),([2],[0]),([3],[0])]) ]):
                 notums = [ [True]*len(dst.mrmap) for dst in dsts ]
                 for i in range(4):
@@ -2937,7 +3005,7 @@ class AVXLoadReplacer(LoadReplacer):
                 for p in [1,2]:
                     notums[2][dsts[2].mrmap.index(p)] = False
                 ld_dst2 = mm256LoadGd(dsts[2].pointer, dsts[2].mrmap, isCompact=dsts[2].isCompact, horizontal=dsts[2].horizontal, not_using_mask=notums[2])
-                immBitList = [0,0,0,0,1,0,0,0] # Move 1st lane to 2nd. 1st lane is zeroed 
+                immBitList = [0,0,0,0,1,0,0,0] # Move 1st lane to 2nd. 1st lane is zeroed
                 inter_lane = mm256Permute2f128Pd(ld_dst2, ld_dst2, immBitList)
                 shuf_1st = mm256ShufflePd(mm256LoadGd(dsts[0].pointer, dsts[0].mrmap, isCompact=dsts[0].isCompact, horizontal=dsts[0].horizontal, not_using_mask=notums[0]), \
                                           mm256LoadGd(dsts[1].pointer, dsts[1].mrmap, isCompact=dsts[1].isCompact, horizontal=dsts[1].horizontal, not_using_mask=notums[1]), [0,0,0,0])
@@ -2949,7 +3017,7 @@ class AVXLoadReplacer(LoadReplacer):
                 notums[0][dsts[0].mrmap.index(0)] = False
                 notums[1][dsts[1].mrmap.index(0)] = False
                 notums[2][dsts[2].mrmap.index(1)] = False
-                ld_dst2 = mm256LoadGd(dsts[2].pointer, dsts[2].mrmap, isCompact=dsts[2].isCompact, horizontal=dsts[2].horizontal, not_using_mask=notums[2]) 
+                ld_dst2 = mm256LoadGd(dsts[2].pointer, dsts[2].mrmap, isCompact=dsts[2].isCompact, horizontal=dsts[2].horizontal, not_using_mask=notums[2])
                 immBitList = [0,0,0,0,1,0,0,0] # Move 1st lane to 2nd. 1st lane is zeroed
                 inter_lane = mm256Permute2f128Pd(ld_dst2, ld_dst2, immBitList)
                 shuf_1st = mm256UnpackloPd(mm256LoadGd(dsts[0].pointer, dsts[0].mrmap, isCompact=dsts[0].isCompact, horizontal=dsts[0].horizontal, not_using_mask=notums[0]), \
@@ -2962,8 +3030,8 @@ class AVXLoadReplacer(LoadReplacer):
                 for dst,notum in zip(dsts,notums):
                     notum[dst.mrmap.index(3)] = False
                 lds = [ mm256LoadGd(dst.pointer, dst.mrmap, isCompact=dst.isCompact, horizontal=dst.horizontal, not_using_mask=notum) for dst,notum in zip(dsts,notums) ]
-                immBitList = [1,0,0,0,0,0,0,1] 
-                perms_lane = [ mm256Permute2f128Pd(ld, ld, immBitList) for ld in lds[:2] ] 
+                immBitList = [1,0,0,0,0,0,0,1]
+                perms_lane = [ mm256Permute2f128Pd(ld, ld, immBitList) for ld in lds[:2] ]
                 shuf1 = mm256UnpackhiPd(perms_lane[0], perms_lane[1])
                 shuf2 = mm256UnpackhiPd(lds[2], mm256SetzeroPd())
                 blend = mm256BlendPd(shuf1, shuf2, [1,1,0,0])
@@ -2974,7 +3042,7 @@ class AVXLoadReplacer(LoadReplacer):
                     notum[dst.mrmap.index(p)] = False
                 lds = [ mm256LoadGd(dst.pointer, dst.mrmap, isCompact=dst.isCompact, horizontal=dst.horizontal, not_using_mask=notum) for dst,notum in zip(dsts,notums) ]
                 perm_lane02 = mm256Permute2f128Pd(lds[0], lds[2], [0,0,1,0,0,0,0,1])
-                blend1 = mm256BlendPd(mm256SetzeroPd(), lds[1], [0,0,1,0]) 
+                blend1 = mm256BlendPd(mm256SetzeroPd(), lds[1], [0,0,1,0])
                 load_rep = mm256BlendPd(perm_lane02, blend1, [1,0,1,0])
                 return load_rep
             elif len(src_dsts_map) == 3 and all([ t[:2] == p for t,p in zip(src_dsts_map,[([0,1],[0,1]),([2],[2]), ([3],[0])]) ]):
@@ -3016,8 +3084,8 @@ class AVXLoadReplacer(LoadReplacer):
                 for dst,notum in zip(dsts,notums):
                     notum[dst.mrmap.index(3)] = False
                 lds = [ mm256LoadGd(dst.pointer, dst.mrmap, isCompact=dst.isCompact, horizontal=dst.horizontal, not_using_mask=notum) for dst,notum in zip(dsts,notums) ]
-                immBitList = [1,0,0,0,0,0,0,1] 
-                perms_lane = [ mm256Permute2f128Pd(ld, ld, immBitList) for ld in lds ] 
+                immBitList = [1,0,0,0,0,0,0,1]
+                perms_lane = [ mm256Permute2f128Pd(ld, ld, immBitList) for ld in lds ]
                 shuf = mm256UnpackhiPd(perms_lane[0], perms_lane[1])
                 return shuf
             elif len(src_dsts_map) == 2 and all([ t[:2] == p for t,p in zip(src_dsts_map,[([0],[0]),([1,2],[0,1])]) ]):
@@ -3025,8 +3093,8 @@ class AVXLoadReplacer(LoadReplacer):
                 notums[0][dsts[0].mrmap.index(0)] = False
                 for p in [0,1]:
                     notums[1][dsts[1].mrmap.index(p)] = False
-                ld_dst1 = mm256LoadGd(dsts[1].pointer, dsts[1].mrmap, isCompact=dsts[1].isCompact, horizontal=dsts[1].horizontal, not_using_mask=notums[1]) 
-                immBitList = [0,0,0,0,1,0,0,0] # Move 1st lane to 2nd. 1st lane is zeroed 
+                ld_dst1 = mm256LoadGd(dsts[1].pointer, dsts[1].mrmap, isCompact=dsts[1].isCompact, horizontal=dsts[1].horizontal, not_using_mask=notums[1])
+                immBitList = [0,0,0,0,1,0,0,0] # Move 1st lane to 2nd. 1st lane is zeroed
                 inter_lane = mm256Permute2f128Pd(ld_dst1, ld_dst1, immBitList)
                 shuf_1st = mm256UnpackloPd(mm256LoadGd(dsts[0].pointer, dsts[0].mrmap, isCompact=dsts[0].isCompact, horizontal=dsts[0].horizontal, not_using_mask=notums[0]), ld_dst1)
 #                 shuf_1st = mm256ShufflePd(mm256LoadGd(dsts[0].pointer, dsts[0].mrmap), mm256LoadGd(dsts[1].pointer, dsts[1].mrmap), [0,0,0,0])
@@ -3057,8 +3125,8 @@ class AVXLoadReplacer(LoadReplacer):
                 for dst,notum,p in zip(dsts,notums,[2,0]):
                     notum[dst.mrmap.index(p)] = False
                 lds = [ mm256LoadGd(dst.pointer, dst.mrmap, isCompact=dst.isCompact, horizontal=dst.horizontal, not_using_mask=notum) for dst,notum in zip(dsts,notums) ]
-                immBitList = [1,0,0,0,0,0,0,1] 
-                perm_lane = mm256Permute2f128Pd(lds[0], lds[0], immBitList) 
+                immBitList = [1,0,0,0,0,0,0,1]
+                perm_lane = mm256Permute2f128Pd(lds[0], lds[0], immBitList)
                 load_rep = mm256BlendPd(perm_lane, lds[1], [0,0,1,0])
                 return load_rep
             elif len(src_dsts_map) == 2 and all([ t[:2] == p for t,p in zip(src_dsts_map,[([0],[2]),([1],[1])]) ]):
@@ -3066,8 +3134,8 @@ class AVXLoadReplacer(LoadReplacer):
                 for dst,notum,p in zip(dsts,notums,[2,1]):
                     notum[dst.mrmap.index(p)] = False
                 lds = [ mm256LoadGd(dst.pointer, dst.mrmap, isCompact=dst.isCompact, horizontal=dst.horizontal, not_using_mask=notum) for dst,notum in zip(dsts,notums) ]
-                immBitList = [1,0,0,0,0,0,0,1] 
-                perm_lane = mm256Permute2f128Pd(lds[0], lds[0], immBitList) 
+                immBitList = [1,0,0,0,0,0,0,1]
+                perm_lane = mm256Permute2f128Pd(lds[0], lds[0], immBitList)
                 load_rep = mm256BlendPd(perm_lane, lds[1], [0,0,1,0])
                 return load_rep
             elif len(src_dsts_map) == 2 and all([ t[:2] == p for t,p in zip(src_dsts_map,[([0],[2]),([1],[2])]) ]):
@@ -3075,8 +3143,8 @@ class AVXLoadReplacer(LoadReplacer):
                 for dst,notum in zip(dsts,notums):
                     notum[dst.mrmap.index(2)] = False
                 lds = [ mm256LoadGd(dst.pointer, dst.mrmap, isCompact=dst.isCompact, horizontal=dst.horizontal, not_using_mask=notum) for dst,notum in zip(dsts,notums) ]
-                immBitList = [1,0,0,0,0,0,0,1] 
-                perms_lane = [ mm256Permute2f128Pd(ld, ld, immBitList) for ld in lds ] 
+                immBitList = [1,0,0,0,0,0,0,1]
+                perms_lane = [ mm256Permute2f128Pd(ld, ld, immBitList) for ld in lds ]
                 shuf = mm256UnpackloPd(perms_lane[0], perms_lane[1])
                 return shuf
             elif len(src_dsts_map) == 2 and all([ t[:2] == p for t,p in zip(src_dsts_map,[([0],[0]),([1],[0])]) ]):
@@ -3099,32 +3167,32 @@ class AVXLoadReplacer(LoadReplacer):
                 if len(src_dsts_map) == 2 and all([ t[:2] == p for t,p in zip(src_dsts_map,[ ([0],[0]) ]) ]): #Blending
                     dst = dsts[0]
                     dnotum = [True]*len(dst.mrmap)
-                    dnotum[0] = False  
+                    dnotum[0] = False
                     ld_dst = mm256LoadGd(dst.pointer, dst.mrmap, isCompact=dst.isCompact, horizontal=dst.horizontal, not_using_mask=dnotum)
                     src.not_using_mask[0] = True
                     imm_list = [0]*dst.reglen
                     imm_list[dst.reglen-1] = 1
                     return mm256BlendPd(src, ld_dst, imm_list)
-                elif len(src_dsts_map) == 2 and all([ t[:2] == p for t,p in zip(src_dsts_map,[ ([0],[1]) ]) ]): 
+                elif len(src_dsts_map) == 2 and all([ t[:2] == p for t,p in zip(src_dsts_map,[ ([0],[1]) ]) ]):
                     dst = dsts[0]
                     dnotum = [True]*len(dst.mrmap)
-                    dnotum[1] = False  
+                    dnotum[1] = False
                     ld_dst = mm256LoadGd(dst.pointer, dst.mrmap, isCompact=dst.isCompact, horizontal=dst.horizontal, not_using_mask=dnotum)
                     blend_dst = mm256BlendPd(src, ld_dst, [0,0,1,0])
                     src.not_using_mask[0] = True
                     return mm256ShufflePd(blend_dst, src, [1,0,1,1])
-                elif len(src_dsts_map) == 2 and all([ t[:2] == p for t,p in zip(src_dsts_map,[ ([1],[0]) ]) ]): 
+                elif len(src_dsts_map) == 2 and all([ t[:2] == p for t,p in zip(src_dsts_map,[ ([1],[0]) ]) ]):
                     dst = dsts[0]
                     dnotum = [True]*len(dst.mrmap)
-                    dnotum[0] = False  
+                    dnotum[0] = False
                     ld_dst = mm256LoadGd(dst.pointer, dst.mrmap, isCompact=dst.isCompact, horizontal=dst.horizontal, not_using_mask=dnotum)
                     blend_dst = mm256BlendPd(src, ld_dst, [0,0,0,1])
                     src.not_using_mask[1] = True
                     return mm256ShufflePd(src, blend_dst, [1,0,0,0])
-                elif len(src_dsts_map) == 2 and all([ t[:2] == p for t,p in zip(src_dsts_map,[ ([1],[1]) ]) ]): 
+                elif len(src_dsts_map) == 2 and all([ t[:2] == p for t,p in zip(src_dsts_map,[ ([1],[1]) ]) ]):
                     dst = dsts[0]
                     dnotum = [True]*len(dst.mrmap)
-                    dnotum[1] = False  
+                    dnotum[1] = False
                     ld_dst = mm256LoadGd(dst.pointer, dst.mrmap, isCompact=dst.isCompact, horizontal=dst.horizontal, not_using_mask=dnotum)
                     src.not_using_mask[1] = True
                     imm_list = [0]*dst.reglen
@@ -3161,7 +3229,7 @@ class AVXLoadReplacer(LoadReplacer):
             src_reg_pos, dst_reg_pos, dst = src_dsts_map[0]
             notum = [True]*len(dst.mrmap)
             for p in dst_reg_pos:
-                notum[dst.mrmap.index(p)] = False  
+                notum[dst.mrmap.index(p)] = False
 
             ld_dst = mm256LoadGd(dst.pointer, dst.mrmap, isCompact=dst.isCompact, horizontal=dst.horizontal, not_using_mask=notum)
 
@@ -3169,7 +3237,7 @@ class AVXLoadReplacer(LoadReplacer):
             for pos in dst_reg_pos:
                 imm_list[dst.reglen-1-pos] = 1
             blend_dst = mm256BlendPd(mm256SetzeroPd(), ld_dst, imm_list)
-            
+
             if src.reglen == 4 and len(src_reg_pos) == 1 and src_reg_pos[0] == tuple(range(4)): #Analogous of bcast with genLoad
                 lane1, posInLane = dst_reg_pos[0] > 1, dst_reg_pos[0] % 2
                 immBitList = [0,0,1,1,0,0,0,1] if lane1 else [0,0,1,0,0,0,0,0]
@@ -3213,14 +3281,14 @@ class AVXLoadReplacer(LoadReplacer):
             else:
                 src_dsts_map = self.src_dsts_map(src, dsts_by_line)
                 raise Exception('len(src_dsts_map) == 1: Cannot load-replace!')
-        
+
     def mm256BroadcastSs(self, src, repList):
         sList = sorted(repList, key=lambda t: t[0], reverse=True)
         dst = sList[0][1]
         if dst.reglen == 8 and dst.mrmap == range(8):
             at = src.pointer.getAt()
             direct = 1 if src.pointer.getMat().size[1] > 1 else 0   # Temp solution
-            lane1, posInLane = at[direct] > 3, at[direct] % 4  
+            lane1, posInLane = at[direct] > 3, at[direct] % 4
             immBitList = [0,0,1,1,0,0,0,1] if lane1 else [0,0,1,0,0,0,0,0]
             dupLane = mm256Permute2f128Ps(mm256LoaduPs(dst.pointer), mm256LoaduPs(dst.pointer), immBitList) # Dup the lane where we can find the value
             return mm256ShufflePs(dupLane, dupLane, [posInLane]*4)
@@ -3232,7 +3300,7 @@ class AVXLoadReplacer(LoadReplacer):
             if dst.reglen == 8: # and dst.mrmap == range(8):
                 at = src.pointer.getAt()
                 direct = 1 if src.pointer.getMat().size[1] > 1 else 0   # Temp solution
-                lane1, posInLane = at[direct] > 3, at[direct] % 4  
+                lane1, posInLane = at[direct] > 3, at[direct] % 4
                 immBitList = [0,0,1,1,0,0,0,1] if lane1 else [0,0,1,0,0,0,0,0]
                 dupLane = mm256Permute2f128Ps(mm256LoadGs(dst.pointer, dst.mrmap), mm256LoadGs(dst.pointer, dst.mrmap), immBitList) # Dup the lane where we can find the value
                 return mm256ShufflePs(dupLane, dupLane, [posInLane]*4)
@@ -3240,7 +3308,7 @@ class AVXLoadReplacer(LoadReplacer):
                 raise Exception('Cannot load-replace!')
         else:
             raise Exception('Cannot load-replace!')
-            
+
 
 class AVX(ISA):
     def __init__(self, opts):
@@ -3248,7 +3316,7 @@ class AVX(ISA):
         self.name = "AVX"
 
         fp_m256d = { 'type': '__m256d' }
-        fp_m256d['arith'] = [ mm256AddPd, mm256SubPd, mm256MulPd, mm256DivPd, mm256HaddPd ]
+        fp_m256d['arith'] = [ mm256AddPd, mm256SubPd, mm256MulPd, mm256DivPd, mm256HaddPd , mm256FmaddPd] #CHANGED HERE
         fp_m256d['load']  = [ mm256LoaduPd, mm256MaskloadPd, mm256BroadcastSd, mm256LoadGd, asm256LoaduPd ]
         fp_m256d['misc']  = [ mm256Permute2f128Pd, mm256PermutePd, mm256ShufflePd, mm256UnpackloPd, mm256UnpackhiPd, mm256BlendPd ]
         fp_m256d['set']   = [ mm256SetzeroPd, mm256Set1Pd ]
@@ -3272,7 +3340,7 @@ class AVX(ISA):
         fp_m256['nublac'] = _Flt8BLAC()
         fp_m256['storer'] = _Flt8Storer()
         fp_m256['loadreplacer'] = fp_m256d['loadreplacer']
-        
+
         self.types = { 'fp': { ('double', 4): fp_m256d, ('float', 8): fp_m256} }
-        
+
         self.add_func_defs = [ asm256LoaduPd, asm256StoreuPd ]
