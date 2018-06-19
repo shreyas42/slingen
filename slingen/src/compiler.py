@@ -162,7 +162,8 @@ class Compiler(object):
         if 'perf_threshold' in self.opts:
             self.perfthreshold = self.opts['perf_threshold']
         return self._compile()
-    
+
+    #this is the method which performs the compilation of LL to SLL
     def _compile(self):
         fine = True
 

@@ -1,5 +1,6 @@
 #!/bin/bash
 
+#just adding a comment here
 set -e
 
 source envvar.sh

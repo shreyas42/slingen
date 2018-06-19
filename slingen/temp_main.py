@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     experiments = [
 
-        ('gemm',testing1toNParam, [(4, 4, 8), [('m', lambda N: N), ('k', lambda N: N), ('n', lambda N: N)] ], 'gemm-4-124-24')
+        ('gemm',testing1toNParam, [(16, 16, 8), [('m', lambda N: N), ('k', lambda N: N), ('n', lambda N: N)] ], 'gemm-4-124-24')
     ]
 
     devices = ['local']

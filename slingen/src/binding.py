@@ -517,17 +517,42 @@ class NewBinder(Binder):
         
         outPhys = self.context.bindingTable.getPhysicalLayout(expr.getInexprMat(0))
         self.context.bindingTable.addBinding(out, outPhys)
-
+    #modifying the Add() and the Mul() methods
     def Add(self, expr, opts):
         out = expr.getOut()
         if self.context.bindingTable.isBound(out):
             return
         getattr(self, expr.inexpr[0].__class__.__name__)(expr.inexpr[0], opts)
         getattr(self, expr.inexpr[1].__class__.__name__)(expr.inexpr[1], opts)
+        #added code
+        #out1 = expr.inexpr[0].getOut()
+        #out2 = expr.inexpr[1].getOut()
+        #if not self.context.bindingTable.isBound(out1) or not self.context.bindingTable.isBound(out2):
+        #    print('FMA detected')
+        #end of added code
         if not self.scattering:
             self.context.bindingTable.addBinding(out, None)
         else:
             self.bindSimpleOp(expr, opts)
+#added the overridden Mul() method
+    def Mul(self , expr , opts):
+        #here's what needs to happen
+        #first off we gotta check if the parent of the expression is a + operator
+        print('Overriden Mul() method ')
+        out  = expr.getOut()
+        if self.context.bindingTable.isBound(out):
+            return
+        parent = expr.pred[0]
+        if parent[0].__class__.__name__ in [ 'Add' , 'Sacc' ]:
+            print('Some dummy print statement')
+            self.context.bindingTable.addBinding(out , None)
+            #okay so it can detect if its parent is a add expression
+            #so what needs to happen next is that it should not be bound
+            getattr(self , expr.inexpr[0].__class__.__name__)(expr.inexpr[0] , opts)
+            getattr(self , expr.inexpr[1].__class__.__name__)(expr.inexpr[1] , opts)
+        else:
+            self.bindSimpleOp(expr , opts)
+#end of overridden method
 
     def LDiv(self, expr, opts):
         self.bindSimpleOp(expr, opts)

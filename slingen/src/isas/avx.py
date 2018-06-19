@@ -891,6 +891,7 @@ class mm256MulPd(RValue):
     def printInst(self, indent):
         return indent + "mm256MulPd( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + " )"
 
+#ported to isas/fma.py
 #adding code for the FMA instruction - again this is a RValue Statement
 class mm256FmaddPd(RValue):
     def __init__(self,src0,src1,src2):
@@ -904,6 +905,7 @@ class mm256FmaddPd(RValue):
 
     def printInst(self,indent):
         return indent + "mm256FmaddPd( " + self.srcs[0].printInst("") + ", " + self.srcs[1].printInst("") + ", " + self.srcs[2].printInst("") + " )"
+
 
 class mm256DivPd(RValue):
     def __init__(self, src0, src1):
@@ -2107,6 +2109,7 @@ class _Dbl4BLAC(object):
                 instr = mm256StoreGd(vadd1, pc, range(nu))
                 instructions += [ instr ]
             else:
+                '''
                 #this is the case of vector-matrix multiplication
                 #FMADD
                 vb0 = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0)]), range(nu))
@@ -2148,7 +2151,7 @@ class _Dbl4BLAC(object):
                 pc = Pointer(dst[dL.of(0),dR.of(0)])
                 instr = mm256StoreGd(mm256AddPd(add0, add1), pc, range(nu))
                 instructions += [ instr ]
-                '''
+
         else:
             if K == 1:
                 #this is the case of an outer-product
@@ -2189,7 +2192,7 @@ class _Dbl4BLAC(object):
                     #this is the general matrix-matrix multiplication case - nu x nu matrices
                     #matrices are represented row-major order
                     #FMADD goes here
-
+                    '''
                     vb0 = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0)]), range(nu))
                     vb1 = mm256LoadGd(Pointer(src1[s1L.of(1),s1R.of(0)]), range(nu))
                     vb2 = mm256LoadGd(Pointer(src1[s1L.of(2),s1R.of(0)]), range(nu))
@@ -2231,8 +2234,68 @@ class _Dbl4BLAC(object):
                         pc = Pointer(dst[dL.of(i),dR.of(0)]) # pointer to row i in the result matrix
                         instr = mm256StoreGd(mm256AddPd(add0, add1), pc, range(nu)) # storing the computation back into the address held by the pointer
                         instructions += [ instr ] # adding the instruction to the instruction sequence
-                    '''
+
         return instructions
+
+    def Fma(self,s0Params,s1Params,s2Params,dParams,opts):
+
+        nu = 4
+        src0 , src1 , src2 , dst = s0Params['nuM'] , s1Params['nuM'] , s2Params['nuM'] , dParams['nuM']
+        s0L , s0R = s0Params['nuML'] , s0Params['nuMR']
+        s1L , s1R = s1Params['nuML'] , s1Params['numR']
+        s2L , s2R = s2Params['nuML'] , s2Params['nuMR']
+        dL , dR = dParams['nuML'] , dParams['numR']
+        #the sizes are obtained the same way for the Mul nuBLAC
+        M , K , N = s0Params['nuMM'] , s0Params['nuMN'] , s1Params['nuMN']
+        instructions = []
+
+        instructions += [ Comment(str(nu) + "-BLAC: " + str(M) + "x" + str(K) + "*" + str(K) + "x" + str(N) + "+" + str(M) + "x" + str(N))]
+
+        if not M == 1:
+            if K == 1:
+                #this is the outer product
+                va0 = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0)]), [tuple(range(nu))])
+                va1 = mm256LoadGd(Pointer(src0[s0L.of(1),s0R.of(0)]), [tuple(range(nu))])
+                va2 = mm256LoadGd(Pointer(src0[s0L.of(2),s0R.of(0)]), [tuple(range(nu))])
+                va3 = mm256LoadGd(Pointer(src0[s0L.of(3),s0R.of(0)]), [tuple(range(nu))])
+                vb = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0)]), range(nu))
+                vc0 = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0)]), [tuple(range(nu))])
+                vc1 = mm256LoadGd(Pointer(src0[s0L.of(1),s0R.of(0)]), [tuple(range(nu))])
+                vc2 = mm256LoadGd(Pointer(src0[s0L.of(2),s0R.of(0)]), [tuple(range(nu))])
+                vc3 = mm256LoadGd(Pointer(src0[s0L.of(3),s0R.of(0)]), [tuple(range(nu))])
+                pc0 = Pointer(dst[dL.of(0),dR.of(0)])
+                pc1 = Pointer(dst[dL.of(1),dR.of(0)])
+                pc2 = Pointer(dst[dL.of(2),dR.of(0)])
+                pc3 = Pointer(dst[dL.of(3),dR.of(0)])
+                instr0 = mm256StoreGd(mm256FmaddPd(va0, vb , vc0), pc0, range(nu))
+                instr1 = mm256StoreGd(mm256FmaddPd(va1, vb , vc1), pc1, range(nu))
+                instr2 = mm256StoreGd(mm256FmaddPd(va2, vb , vc2), pc2, range(nu))
+                instr3 = mm256StoreGd(mm256FmaddPd(va3, vb , vc3), pc3, range(nu))
+                instructions += [ instr0, instr1, instr2, instr3 ]
+
+            else:
+                if not N == 1:
+                    vb0 = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0)]), range(nu))
+                    vb1 = mm256LoadGd(Pointer(src1[s1L.of(1),s1R.of(0)]), range(nu))
+                    vb2 = mm256LoadGd(Pointer(src1[s1L.of(2),s1R.of(0)]), range(nu))
+                    vb3 = mm256LoadGd(Pointer(src1[s1L.of(3),s1R.of(0)]), range(nu))
+                    for i in range(nu):
+                        pc = Pointer(dst[dL.of(i),dR.of(0)])
+                        res = mm256LoadGd(pc, range(nu))
+
+                        vai0 = mm256LoadGd(Pointer(src0[s0L.of(i),s0R.of(0)]), [tuple(range(nu))]) # broadcasting element 0 in row i
+                        vai1 = mm256LoadGd(Pointer(src0[s0L.of(i),s0R.of(1)]), [tuple(range(nu))]) # broadcasting element 1 in row i
+                        vai2 = mm256LoadGd(Pointer(src0[s0L.of(i),s0R.of(2)]), [tuple(range(nu))]) # broadcasting element 2 in row i
+                        vai3 = mm256LoadGd(Pointer(src0[s0L.of(i),s0R.of(3)]), [tuple(range(nu))]) # broadcasting element 3 in row i
+
+                        res = mm256FmaddPd(vai0,vb0,res)
+                        res = mm256FmaddPd(vai1,vb1,res)
+                        res = mm256FmaddPd(vai2,vb2,res)
+                        res = mm256FmaddPd(vai3,vb3,res)
+
+                        instr = mm256StoreGd(res, pc, range(nu))
+                        instructions += [ instr ]
+
 
     def Kro(self, s0Params, s1Params, dParams, opts):
 

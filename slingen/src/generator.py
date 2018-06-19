@@ -47,8 +47,9 @@ class Generator(object):
 
 class CodeGenerator(Generator):
     def __init__(self, expr, opts):
+
         self.counter = count()
-        self.nublac = opts['isaman'].getNuBLAC(opts['precision'], opts['nu'])
+        self.nublac = opts['isaman'].getNuBLAC(opts['precision'], opts['nu']) #self.nublac is an ISAManager defined inside isabase.py
 #         self.allocator = src.nublac.NuAllocator()
         self.allocator = NeonAllocator() if ARMv7 in opts['isaman'].isaList else NuAllocator()
         self.gen(expr, opts)
@@ -921,6 +922,7 @@ class StructuresConstructor(object):
             dst.genStruct = {}
             s0, s1 = src0.genStruct, src1.genStruct
             pairs = [ (p0,p1) for p0 in s0 for p1 in s1 ]
+            #print(*pairs)
             for p in pairs:
                 if p[0] is ZeroMatrix and p[1] is ZeroMatrix:
                     dst.genStruct[ZeroMatrix] = s0[p[0]].intersect(s1[p[1]]) 
