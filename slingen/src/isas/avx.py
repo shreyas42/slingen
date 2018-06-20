@@ -2242,9 +2242,9 @@ class _Dbl4BLAC(object):
         nu = 4
         src0 , src1 , src2 , dst = s0Params['nuM'] , s1Params['nuM'] , s2Params['nuM'] , dParams['nuM']
         s0L , s0R = s0Params['nuML'] , s0Params['nuMR']
-        s1L , s1R = s1Params['nuML'] , s1Params['numR']
+        s1L , s1R = s1Params['nuML'] , s1Params['nuMR']
         s2L , s2R = s2Params['nuML'] , s2Params['nuMR']
-        dL , dR = dParams['nuML'] , dParams['numR']
+        dL , dR = dParams['nuML'] , dParams['nuMR']
         #the sizes are obtained the same way for the Mul nuBLAC
         M , K , N = s0Params['nuMM'] , s0Params['nuMN'] , s1Params['nuMN']
         instructions = []
@@ -2295,7 +2295,7 @@ class _Dbl4BLAC(object):
 
                         instr = mm256StoreGd(res, pc, range(nu))
                         instructions += [ instr ]
-
+        return instructions
 
     def Kro(self, s0Params, s1Params, dParams, opts):
 

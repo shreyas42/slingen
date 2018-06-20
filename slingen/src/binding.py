@@ -47,25 +47,29 @@ class BindingTable(object):
         newPairs = [(k, newPhys) for k in oldKeys]
         self.table.update(newPairs)
 
-    def replaceConnectedPhysicalLayout(self, oldPhys, newPhys, expr):
+    def replaceConnectedPhysicalLayout(self, oldPhys, newPhys, expr, stopOnNone=False):
         logic = expr.getOut().name
         phys = self.table[logic]
         replaced = set()
-        if phys is None:
+        if phys is None and not stopOnNone:
             if isinstance(expr, Operator):
                 for sub in expr.inexpr:
+                    #new change
+                    stopOnNone = stopOnNone or isinstance(sub, ParamMat)
                     subPhys = self.table[sub.getOut().name]
-                    replaced.update( self.replaceConnectedPhysicalLayout(subPhys, newPhys, sub) )
+                    replaced.update( self.replaceConnectedPhysicalLayout(subPhys, newPhys, sub, stopOnNone) )
         elif phys == oldPhys:
             self.table.update([(logic,newPhys)])
             replaced.update([phys])
             if isinstance(expr, Operator):
                 for sub in expr.inexpr:
-                    replaced.update( self.replaceConnectedPhysicalLayout(oldPhys, newPhys, sub) )
+                    #new change
+                    stopOnNone = stopOnNone or isinstance(sub, ParamMat)
+                    replaced.update( self.replaceConnectedPhysicalLayout(oldPhys, newPhys, sub, stopOnNone) )
         return replaced
     
     def isBound(self, mat):
-        return mat.name in self.table #and self.table[mat.name] is not None
+        return mat.name in self.table and self.table[mat.name] is not None # Any reason why the last condition should go??
 
     def existPhysicalLayout(self, phys):
         return phys in self.table.values()
@@ -490,7 +494,11 @@ class NewBinder(Binder):
         out = expr.getOut()
         if self.context.bindingTable.isBound(out):
             return
+        print(expr.inexpr[0].__class__.__name__)
         getattr(self, expr.inexpr[0].__class__.__name__)(expr.inexpr[0], opts)
+
+        #added code
+        #end of added code
 
         sub = expr.getInexprMat(0)
 
@@ -517,7 +525,9 @@ class NewBinder(Binder):
         
         outPhys = self.context.bindingTable.getPhysicalLayout(expr.getInexprMat(0))
         self.context.bindingTable.addBinding(out, outPhys)
+
     #modifying the Add() and the Mul() methods
+
     def Add(self, expr, opts):
         out = expr.getOut()
         if self.context.bindingTable.isBound(out):
@@ -534,7 +544,9 @@ class NewBinder(Binder):
             self.context.bindingTable.addBinding(out, None)
         else:
             self.bindSimpleOp(expr, opts)
+
 #added the overridden Mul() method
+
     def Mul(self , expr , opts):
         #here's what needs to happen
         #first off we gotta check if the parent of the expression is a + operator
@@ -543,6 +555,7 @@ class NewBinder(Binder):
         if self.context.bindingTable.isBound(out):
             return
         parent = expr.pred[0]
+        print(parent[0].__class__.__name__)
         if parent[0].__class__.__name__ in [ 'Add' , 'Sacc' ]:
             print('Some dummy print statement')
             self.context.bindingTable.addBinding(out , None)

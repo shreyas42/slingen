@@ -2017,9 +2017,9 @@ class Expression(object):
         return Mul(self, other)
     
     def getInexprMat(self, i):
-        if isinstance(self, Quantity):
+        if isinstance(self, Quantity): #you can only get the matrix associated with operations, doesnt work on quantities : i think
             return None
-        return self.inexpr[i].getOut()
+        return self.inexpr[i].getOut() #retunrs the matrix(logical)
 #         if isinstance(self.inexpr[i], Quantity):
 #             return self.inexpr[i]
 #         if isinstance(self.inexpr[i], list):

@@ -339,10 +339,15 @@ class CodeGenerator(Generator):
         for sub in expr.inexpr:
             getattr(self, sub.__class__.__name__)(sub, opts, bounds, context, setComp)
 
+        #start of added code
+        #adding a guard to check if the matrix is bound - if it is we can generate code normally otherwise we skip
+        #generating code at this step
+        out = expr.getOut()
+
         src0 = expr.getInexprMat(0)
         src1 = expr.getInexprMat(1)
         dst = expr.out
-        
+
         s0Params, s1Params = self.allocator.extractParams(src0, bounds, opts), self.allocator.extractParams(src1, bounds, opts)
         dParams = self.allocator.extractParams(dst, bounds, opts)
 
@@ -363,7 +368,7 @@ class CodeGenerator(Generator):
             s0L, s0R = s0Params['mL'], s0Params['mR']
             s1L, s1R = s1Params['mL'], s1Params['mR']
             dL, dR   = dParams['mL'], dParams['mR']
-            
+
             block.instructions += [ Comment("Clean-up: " + str(M) + "x" + str(s0K) + " * " + str(s1K) + "x" + str(N)) ]
             for i in range(M):
                 for j in range(N):
@@ -376,8 +381,8 @@ class CodeGenerator(Generator):
                         t = ScaMul(sa(src0[s0L.of(i),s0R.of(k)]), sa(src1[s1L.of(k),s1R.of(j)]))
                         instr = Mov(ScaAdd(sa(dst[dL.of(i),dR.of(j)]), t), sa(dst[dL.of(i),dR.of(j)]))
                         block.instructions += [ instr ]
-                    
-        
+
+
         if context is not None:
             context.blocks += [ block ]
         else:
@@ -581,7 +586,7 @@ class StructuresConstructor(object):
 
     def replaceConnectedPhysicalLayout(self, newPhys, expr, i):
         subPhys = icode.bindingTable.getPhysicalLayout(expr.getInexprMat(i))
-        icode.bindingTable.replaceConnectedPhysicalLayout(subPhys, newPhys, expr.inexpr[i])
+        icode.bindingTable.replaceConnectedPhysicalLayout(subPhys, newPhys, expr.inexpr[i], stopOnNone=True)
         if not icode.bindingTable.existPhysicalLayout(subPhys):
             icode.declare.remove(subPhys)
         
@@ -1756,7 +1761,7 @@ class StructuresGenerator(Generator):
         if expr.out.genStruct is None:
             expr.out.genStruct = expr.getInexprMat(0).genStruct
         
-
+#MARKER
     def Add(self, expr, opts, genopts, bounds, context=None):
         if expr.isComputed(): return
         for sub in expr.inexpr:
@@ -1900,7 +1905,9 @@ class StructuresGenerator(Generator):
 #             context.blocks += [ block ]
 #         else:
 #             icode.blocks += [ block ]
-#         expr.setComputed(setComp)        
+#         expr.setComputed(setComp)
+
+    #WAYPOINT
     def Mul(self, expr, opts, genopts, bounds, context=None):
         if expr.isComputed(): return
 
@@ -1913,11 +1920,16 @@ class StructuresGenerator(Generator):
 #         for sub in expr.inexpr:
 #             getattr(self, sub.__class__.__name__)(sub, opts, genopts, bounds, context)
 
+        dst , nuDst = expr.out , expr.nuout
+
+        #adding a guard here similar to the one in the Add() method
+        #this means that only if the matrix is bound and is associated with a physical layout will code be generated,
+        #otherwise this means it gets skipped
+
         src0, src1 = expr.getInexprMat(0), expr.getInexprMat(1)
-        dst = expr.out
+
         nuSrc0, nuSrc1 = expr.getInexprNuMat(0), expr.getInexprNuMat(1)
-        nuDst = expr.nuout
-# 
+#
 #         src0 = expr.getInexprMat(0)
 #         src1 = expr.getInexprMat(1)
 #         dst = expr.out
@@ -1928,7 +1940,7 @@ class StructuresGenerator(Generator):
         s0Params = self.allocator.extractParams(src0, bounds, opts, bcast=genopts['bcast'][src0.name], subNuM=nuSrc0)
         s1Params = self.allocator.extractParams(src1, bounds, opts, bcast=genopts['bcast'][src1.name], subNuM=nuSrc1)
         dParams = self.allocator.extractParams(dst, bounds, opts, bcast=genopts['bcast'][dst.name], subNuM=nuDst)
-        expr.nuout = dParams['nuM'] 
+        expr.nuout = dParams['nuM']
 
         block = IBlock()
 
@@ -1954,10 +1966,10 @@ class StructuresGenerator(Generator):
 #                         t = ScaMul(sa(src0[s0L.of(i),s0R.of(k)]), sa(src1[s1L.of(k),s1R.of(j)]))
 #                         instr = Mov(ScaAdd(sa(dst[dL.of(i),dR.of(j)]), t), sa(dst[dL.of(i),dR.of(j)]))
 #                         block.instructions += [ instr ]
-                    
+
         for i in block.instructions:
-            i.setIterSet(genopts['indices'], genopts['iterset'])  
-            
+            i.setIterSet(genopts['indices'], genopts['iterset'])
+
         if context is not None:
             context.blocks += [ block ]
         else:
@@ -2116,6 +2128,271 @@ class StructuresGenerator(Generator):
         else:
             icode.blocks += [ block ]
         expr.setComputed(genopts['setComp'])
+
+#Class newGenerator updates inherits from the structure generator
+#the temp_slingen will now be using this as the default code generator
+
+class NewGenerator(StructuresGenerator):
+    def __init__(self , sllprog , opts):
+        super(NewGenerator , self).__init__( sllprog , opts)
+
+    #overriding the Add and Mul methods for the New structure generator
+
+    def Add(self, expr, opts, genopts, bounds, context=None):
+
+        if expr.isComputed(): return
+        for sub in expr.inexpr:
+            #             genoptsCopy = deepcopy(genopts)
+            #             genoptsCopy['bcast'] = False
+            getattr(self, sub.__class__.__name__)(sub, opts, genopts, bounds, context)
+
+        dst, nuDst = expr.out, expr.nuout
+        if icode.bindingTable.isBound(dst) and icode.bindingTable.getPhysicalLayout(dst) is not None:
+
+            #inserting the second guard here
+            #basically this needs to make sure that the child of the expression has no binding or not
+
+            mat_1 = expr.inexpr[0]
+            mat_2 = expr.inexpr[1]
+
+            is_fused = False
+
+            if not mat_1.isComputed():
+                #the multiply operator is now on the left
+                #so we recursively get the first two operators from the left
+                is_fused = True
+                src0 , nuSrc0 = mat_1.getInexprMatNuMat(0)
+                src1 , nuSrc1 = mat_1.getInexprMatNuMat(1)
+                src2 , nuSrc2 = expr.getInexprMatNuMat(1)
+
+            elif not mat_2.isComputed():
+                is_fused = True
+                src0 , nuSrc0 = mat_2.getInexprMatNuMat(0)
+                src1 , nuSrc1 = mat_2.getInexprMatNuMat(1)
+                src2 , nuSrc2 = expr.getInexprMatNuMat(0)
+
+            else:
+                src0, nuSrc0 = expr.getInexprMatNuMat(0)
+                src1, nuSrc1 = expr.getInexprMatNuMat(1)
+
+            s0Params = self.allocator.extractParams(src0, bounds, opts, subNuM=nuSrc0)
+            s1Params = self.allocator.extractParams(src1, bounds, opts, subNuM=nuSrc1)
+            if is_fused:
+                s2Params = self.allocator.extractParams(src2 , bounds , opts , subNuM = nuSrc2)
+            dParams = self.allocator.extractParams(dst, bounds, opts, subNuM=nuDst)
+            expr.nuout = dParams['nuM']
+
+            block = IBlock()
+
+            #             if s0Params['nuable'] and s1Params['nuable'] and dParams['nuable']:
+            #will probably have to add the fma mapping to the self.nublac
+            if is_fused:
+                block.instructions += self.nublac.Fma(s0Params , s1Params , s2Params , dParams , opts)
+            else:
+                block.instructions += self.nublac.Add(s0Params, s1Params, dParams, opts)
+            #             else:
+            #                 s0L, s0R = s0Params['mL'], s0Params['mR']
+            #                 s1L, s1R = s1Params['mL'], s1Params['mR']
+            #                 dL, dR   = dParams['mL'], dParams['mR']
+            #                 M, N = dParams['M'], dParams['N']
+            #                 for i in range(M):
+            #                     for j in range(N):
+            #                         instr = Mov(ScaAdd(sa(src0[s0L.of(i),s0R.of(j)]), sa(src1[s1L.of(i),s1R.of(j)])), sa(dst[dL.of(i),dR.of(j)]))
+            #                         block.instructions += [ instr ]
+
+
+            for i in block.instructions:
+                i.setIterSet(genopts['indices'], genopts['iterset'])
+
+            if context is not None:
+                context.blocks += [ block ]
+            else:
+                icode.blocks += [ block ]
+
+        #             block = IBlock()
+        #             instr = Mov(ScaAdd(sa(src0[src0.fL.of(0),src0.fR.of(0)]), sa(src1[src1.fL.of(0),src1.fR.of(0)])), sa(dst[dst.fL.of(0),dst.fR.of(0)]))
+        #             block.instructions += [ instr ]
+        #
+        #
+        #             if context is not None:
+        #                 context.blocks += [ block ]
+        #             else:
+        #                 icode.blocks += [ block ]
+        expr.setComputed(genopts['setComp'])
+
+
+    def Mul(self, expr, opts, genopts, bounds, context=None):
+        if expr.isComputed(): return
+
+        #         bcast = True if not dst.isScalar() and (src0.isScalar() or src1.isScalar()) else False
+        for sub in expr.inexpr:
+            #             genoptsCopy = deepcopy(genopts)
+            #             genoptsCopy['bcast'] = bcast
+            getattr(self, sub.__class__.__name__)(sub, opts, genopts, bounds, context)
+
+        #         for sub in expr.inexpr:
+        #             getattr(self, sub.__class__.__name__)(sub, opts, genopts, bounds, context)
+
+        dst , nuDst = expr.out , expr.nuout
+
+        #adding a guard here similar to the one in the Add() method
+        #this means that only if the matrix is bound and is associated with a physical layout will code be generated,
+        #otherwise this means it gets skipped
+
+        if icode.bindingTable.isBound(dst) and icode.bindingTable.getPhysicalLayout(dst) is not None:
+
+            src0, src1 = expr.getInexprMat(0), expr.getInexprMat(1)
+
+            nuSrc0, nuSrc1 = expr.getInexprNuMat(0), expr.getInexprNuMat(1)
+            #
+            #         src0 = expr.getInexprMat(0)
+            #         src1 = expr.getInexprMat(1)
+            #         dst = expr.out
+            #
+            #         s0Params, s1Params = self.allocator.extractParams(src0, bounds, opts), self.allocator.extractParams(src1, bounds, opts)
+            #         dParams = self.allocator.extractParams(dst, bounds, opts)
+
+            s0Params = self.allocator.extractParams(src0, bounds, opts, bcast=genopts['bcast'][src0.name], subNuM=nuSrc0)
+            s1Params = self.allocator.extractParams(src1, bounds, opts, bcast=genopts['bcast'][src1.name], subNuM=nuSrc1)
+            dParams = self.allocator.extractParams(dst, bounds, opts, bcast=genopts['bcast'][dst.name], subNuM=nuDst)
+            expr.nuout = dParams['nuM']
+
+            block = IBlock()
+
+            M, s0K, s1K, N = s0Params['M'], s0Params['N'], s1Params['M'], s1Params['N']
+
+            #         if s0Params['nuable'] and s1Params['nuable'] and dParams['nuable']:
+            if (M*s0K == 1) or (s1K*N == 1):
+                block.instructions += self.nublac.Kro(s0Params, s1Params, dParams, opts)
+            else:
+                block.instructions += self.nublac.Mul(s0Params, s1Params, dParams, opts)
+            #         else:
+            #             s0L, s0R = s0Params['mL'], s0Params['mR']
+            #             s1L, s1R = s1Params['mL'], s1Params['mR']
+            #             dL, dR   = dParams['mL'], dParams['mR']
+            #             for i in range(M):
+            #                 for j in range(N):
+            #                     instr = Mov(ScaMul(sa(src0[s0L.of(i),s0R.of(0)]), sa(src1[s1L.of(0),s1R.of(j)])), sa(dst[dL.of(i),dR.of(j)]))
+            #                     block.instructions += [ instr ]
+            #
+            #             for k in range(1,s0K):
+            #                 for i in range(M):
+            #                     for j in range(N):
+            #                         t = ScaMul(sa(src0[s0L.of(i),s0R.of(k)]), sa(src1[s1L.of(k),s1R.of(j)]))
+            #                         instr = Mov(ScaAdd(sa(dst[dL.of(i),dR.of(j)]), t), sa(dst[dL.of(i),dR.of(j)]))
+            #                         block.instructions += [ instr ]
+
+            for i in block.instructions:
+                i.setIterSet(genopts['indices'], genopts['iterset'])
+
+            if context is not None:
+                context.blocks += [ block ]
+            else:
+                icode.blocks += [ block ]
+            expr.setComputed(genopts['setComp'])
+
+#overriding this method - need to introduce a guard to choose between an FMA instruction and an addition/subtraction
+
+    def Sacc(self, expr, opts, genopts, bounds, context=None):
+        if expr.isComputed(): return
+
+        sub = expr.getInexprMat(0)
+        dst = expr.out
+
+        #added code
+        chld_expr = expr.inexpr[0]
+        is_fused = False
+        if not chld_expr.isComputed():
+            is_fused = True
+        #end of added code
+
+        #print(is_fused) is true if the child expression is not computed , which is the case in our fused multiply operations
+
+        gatDst = G(expr.fL, dst, expr.fR, setAsPred=False)
+        gdst = gatDst.getOut()
+        dstPhys = icode.bindingTable.getPhysicalLayout(dst)
+        icode.bindingTable.addBinding(gdst, dstPhys)
+        gdst.fL, gdst.fR, gdst.genStruct = expr.fL, expr.fR, expr.out.genStruct
+        gdst.setGenAccess(expr.out.genAccess())
+
+        if is_fused:
+            sub1 = chld_expr.getInexprMat(0)
+            sub2 = chld_expr.getInexprMat(1)
+            subParams1 = self.allocator.extractParams(sub1 , bounds , opts , bcast=genopts['bcast'][sub1.name])
+            subParams2 = self.allocator.extractParams(sub2 , bounds , opts , bcast=genopts['bcast'][sub2.name])
+
+        else:
+            subParams = self.allocator.extractParams(sub, bounds, opts, bcast=genopts['bcast'][sub.name])
+            expr.inexpr[0].nuout = subParams['nuM'] #what does this do?
+
+
+        if genopts.get('init', False):
+            dParams = self.allocator.extractParams(gdst, bounds, opts, subNuM=expr.pred[0][0].getNuOut())
+        else:
+            dParams = self.allocator.extractParams(gdst, bounds, opts) # In case of $ dParams can be associated to a different nuout
+
+        if sub.size[0] > opts['nu'] or sub.size[1] > opts['nu']:
+            block = IBlock()
+            block.instructions += self.Pack([dParams, subParams], opts)
+
+            for i in block.instructions:
+                i.setIterSet(genopts['indices'], genopts['iterset'])
+
+            if context is not None:
+                context.blocks += [ block ]
+            else:
+                icode.blocks += [ block ]
+
+        for s in expr.inexpr:
+            getattr(self, s.__class__.__name__)(s, opts, genopts, bounds, context)
+
+        block = IBlock()
+
+        if sub.size[0] > opts['nu'] or sub.size[1] > opts['nu']:
+            block.instructions += self.Unpack([subParams, dParams], opts)
+        else:
+            #             if subParams['nuable'] and dParams['nuable']:
+            if genopts.get('init', False):
+                block.instructions += self.nublac.Add(subParams, dParams, dParams, opts)
+            else:
+                block.instructions += self.Load([dParams], opts)
+                #added code
+                if is_fused:
+                    block.instructions += self.nublac.Fma(subParams1 , subParams2 , dParams , dParams , opts)
+                else:
+                    if expr.neg:
+                        block.instructions += self.nublac.Sub(dParams, subParams, dParams, opts)
+                    else:
+                        block.instructions += self.nublac.Add(dParams, subParams, dParams, opts)
+                block.instructions += self.Store([dParams], opts)
+        #       #end of added code
+        #       else:
+        #                 subL, subR = subParams['mL'], subParams['mR']
+        #                 dL, dR   = dParams['mL'], dParams['mR']
+        #                 M, N = subParams['M'], subParams['N']
+        #                 for i in range(M):
+        #                     for j in range(N):
+        #                         instr = Mov(ScaAdd(sa(dst[dL.of(i),dR.of(j)]), sa(sub[subL.of(i),subR.of(j)])), sa(dst[dL.of(i),dR.of(j)]))
+        #                         block.instructions += [ instr ]
+
+        for i in block.instructions:
+            i.setIterSet(genopts['indices'], genopts['iterset'])
+
+        if context is not None:
+            context.blocks += [ block ]
+        else:
+            icode.blocks += [ block ]
+
+        #         block = IBlock()
+        #         instr = Mov(ScaAdd(sa(dst[expr.fL.of(0),expr.fR.of(0)]),sa(sub[sub.fL.of(0),sub.fR.of(0)])), sa(dst[expr.fL.of(0),expr.fR.of(0)]))
+        #         block.instructions += [ instr ]
+        #
+        #         if context is not None:
+        #             context.blocks += [ block ]
+        #         else:
+        #             icode.blocks += [ block ]
+        expr.setComputed(genopts['setComp'])
+
 
 if __name__ == '__main__':
     pass
