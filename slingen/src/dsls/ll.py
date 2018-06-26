@@ -2485,6 +2485,9 @@ class Descriptor(object):
         self.rows = []
         self.info = {}
 
+    def get_field(self):
+        return self.getBlock(0,0).get_field()
+
     def is_bounded(self):
         size = self.getSize()
         idcs, dom_info = self.info.get('indices', []), self.info.get('polytope', Set("{[]}"))
@@ -2799,6 +2802,13 @@ class Block(Expression):
             elif self.is_also_empty():
                 print "Warning: Block %s is also empty: %s over domain %s" % ( self.name, str(self.descriptor), str(dom_info) )
 
+    #added a new method get_field
+    #basically this returns the type of the block - real or complex
+    #CHANGE2
+    def get_field(self):
+        if self.descriptor.getScalar() is not None:
+            return self.descriptor.getScalar().name
+
     def is_bounded(self):
         idcs, dom_info = self.info.get('indices', []), self.info.get('polytope', Set("{[]}"))
         size_bounded = all( map(lambda s: expr_is_bounded_over_domain(idcs, dom_info, s), self.size) )
@@ -2970,8 +2980,12 @@ class Block(Expression):
 
 # empty  = Empty()
 # scalar = Block("scalar", empty, (1,1))
-def scalar_block():
-    return Block("real", Empty(), (1,1))
+
+#going to modify this method , so that the name of the block can be a real or a complex
+#change now is that the function is parametrized and the parameter takes a default value of real if not explicitly specified as complex
+#CHANGE 1
+def scalar_block(name = "real"):
+    return Block(name , Empty(), (1,1))
 
 ##############################################
 #--------------Metaclasses-------------------#
@@ -7653,5 +7667,7 @@ if __name__ == "__main__":
     if __VERBOSE__:
         m = Matrix('name', Empty(), (2,0))
         m1 = Matrix('name', Empty(), (2,0))
+
+        b = Block('complex' ,Empty() (1,1))
         print (m+m1).get_pot_zero_dims()
     

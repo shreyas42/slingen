@@ -137,6 +137,9 @@ class llParser(Parser):
                 self._token('tInOut')
             self._error('expecting one of: Input tInput tInOut tOutput InOut Output')
 
+#gonna try something here
+#the goal is to add the ability to specify storage representation and type of matrix into the
+
     @rule_def
     def _prop_(self):
         with self._choice():

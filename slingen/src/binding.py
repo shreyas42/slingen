@@ -93,8 +93,8 @@ class Binder(object):
         self.context = context
     
     def apply(self, sllprog, opts):
-        self._populate_binding_table(sllprog.mDict, opts)
-        self._apply(sllprog.stmtList, opts)
+        self._populate_binding_table(sllprog.mDict, opts) #mDict is the matrix information
+        self._apply(sllprog.stmtList, opts) #apply the binding
 
     def _populate_binding_table(self, mat_dict, opts):
         import networkx as nx
@@ -422,7 +422,8 @@ def detectNonScalarizableMats(duList, opts):
 
 def bindExpression(sllprog, context, opts=None):
 #     binder = Binder(context)
-    binder = NewBinder(context)
+#    binder = NewBinder(context)
+    binder = EnhancedBinder(context)
     binder.apply(sllprog, opts)
     tsig = []
     for m in opts['inoutorder']:
@@ -550,14 +551,14 @@ class NewBinder(Binder):
     def Mul(self , expr , opts):
         #here's what needs to happen
         #first off we gotta check if the parent of the expression is a + operator
-        print('Overriden Mul() method ')
+        #print('Overriden Mul() method ')
         out  = expr.getOut()
         if self.context.bindingTable.isBound(out):
             return
         parent = expr.pred[0]
-        print(parent[0].__class__.__name__)
+        #print(parent[0].__class__.__name__)
         if parent[0].__class__.__name__ in [ 'Add' , 'Sacc' ]:
-            print('Some dummy print statement')
+        #    print('Some dummy print statement')
             self.context.bindingTable.addBinding(out , None)
             #okay so it can detect if its parent is a add expression
             #so what needs to happen next is that it should not be bound
@@ -618,6 +619,136 @@ class NewBinder(Binder):
     def AllEntriesConstantMatrixWithValue(self, expr, opts):
         self.ConstantMatrix(expr, opts)
 
+#MARKER FOR CHANGE IN CODE
+#assuming that we arent introducing a new physical layout and are using the same concept of an array
+#the only change is what we pass as size to the Array constructor?
+#do any functions(outside of the Binder classes) need to change?
+
+class EnhancedBinder(NewBinder):
+    def __init__(self , context):
+        super(EnhancedBinder , self).__init__(context)
+
+    def _populate_binding_table(self, mat_dict, opts):
+        import networkx as nx
+        g = nx.DiGraph()
+        for name,mat in mat_dict.iteritems():
+            ow = mat.attr.get('ow', None)
+            if ow is None:
+                g.add_node(name)
+            else:
+                g.add_edge(name, ow)
+        order_of_decl = nx.topological_sort(g, reverse=True)
+        for name in order_of_decl:
+            mat = mat_dict[name]
+            phys_size = mat.size
+            if mat.get_field() == 'complex':
+                phys_size[1] *= 2
+            if mat.attr.get('ow', None) is not None:
+                self.context.bindingTable.add_binding_overwrite(mat)
+            else:
+                if not mat.attr['o'] and mat.isScalar():
+                    physLayout = Scalars(mat.name, mat.size, opts, isIn=mat.attr['i'], isParam=True)
+                else:
+                    physLayout = Array(mat.name, phys_size, opts, isIn=mat.attr['i'], isOut=mat.attr['o'])
+                if self.context.bindingTable.addBinding(mat, physLayout):
+                    if mat.attr['t']:
+                        physLayout.safelyScalarize = opts['scarep']
+                        self.context.declare += [physLayout]
+                    else:
+                        self.context.signature += [physLayout]
+
+    def bindSimpleOp(self , expr , opts):
+        out = expr.getOut()
+        if self.context.bindingTable.isBound(out):
+            return
+
+        getattr(self, expr.inexpr[0].__class__.__name__)(expr.inexpr[0], opts)
+        getattr(self, expr.inexpr[1].__class__.__name__)(expr.inexpr[1], opts)
+
+        phys_size = out.size
+        if out.get_field() == 'complex':
+            phys_size[1] *= 2
+
+        outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'])
+        if self.context.bindingTable.addBinding(out, outPhys):
+            self.context.declare += [outPhys]
+
+    def bindSimpleUnary(self, expr, opts):
+        out = expr.getOut()
+        if self.context.bindingTable.isBound(out):
+            return
+
+        getattr(self, expr.inexpr[0].__class__.__name__)(expr.inexpr[0], opts)
+        phys_size = out.size
+        if out.get_field() == 'complex':
+            phys_size[1] *= 2
+        outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'])
+        if self.context.bindingTable.addBinding(out, outPhys):
+            self.context.declare += [outPhys]
+
+    def G(self , expr , opts):
+        out = expr.getOut()
+        if out.size[0] <= opts['nu'] and out.size[1] <= opts['nu']:
+            getattr(self, expr.inexpr[0].__class__.__name__)(expr.inexpr[0], opts)
+
+            subPhys = self.context.bindingTable.getPhysicalLayout(expr.getInexprMat(0))
+            self.context.bindingTable.addBinding(out, subPhys)
+            out.fL, out.fR = expr.fL, expr.fR
+        else:
+            if self.context.bindingTable.isBound(out):
+                return
+            getattr(self, expr.inexpr[0].__class__.__name__)(expr.inexpr[0], opts)
+            phys_size = out.size
+            if out.get_field() == 'complex':
+                phys_size[1] *= 2
+            outPhys = Array(out.name, phys_size, opts)
+            if self.context.bindingTable.addBinding(out, outPhys):
+                self.context.declare += [outPhys]
+
+    def S(self, expr, opts):
+        self.scattering += 1
+        out = expr.getOut()
+        if self.context.bindingTable.isBound(out):
+            return
+        getattr(self, expr.inexpr[0].__class__.__name__)(expr.inexpr[0], opts)
+
+        sub = expr.getInexprMat(0)
+        safelyScalarize = opts['scarep'] and sub.size[0] <= opts['nu'] and sub.size[1] <= opts['nu']
+        phys_size = out.size
+        if out.get_field() == 'complex':
+            phys_size[1] *= 2
+        outPhys = Array(out.name, phys_size, opts, safelyScalarize=safelyScalarize)
+        if self.context.bindingTable.addBinding(out, outPhys):
+            self.context.declare += [outPhys]
+
+        self.scattering -= 1
+
+    def Sacc(self, expr, opts):
+        #         self.S(expr, opts)
+        self.scattering += 1
+        out = expr.getOut()
+        if self.context.bindingTable.isBound(out):
+            return
+        print(expr.inexpr[0].__class__.__name__)
+        getattr(self, expr.inexpr[0].__class__.__name__)(expr.inexpr[0], opts)
+
+        sub = expr.getInexprMat(0)
+
+        phys_size = out.size
+        if out.get_field() == 'complex':
+            phys_size[1] *= 2
+
+        if sub.size[0]*sub.size[1] <= opts['nu']*opts['nu']:
+            outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'])
+            if self.context.bindingTable.addBinding(out, outPhys):
+                self.context.declare += [outPhys]
+        else:
+            outPhys = Array(out.name, phys_size, opts)
+            if self.context.bindingTable.addBinding(out, outPhys):
+                self.context.declare += [outPhys]
+
+        self.scattering -= 1
+
 ###################################################################################
 
 class Reference(object):
@@ -626,13 +757,17 @@ class Reference(object):
         self.physLayout = physLayout
 
     @staticmethod
-    def whatRef(PhysLayout):
-        if issubclass(PhysLayout, Array):
-            return ArrayReference
-        if issubclass(PhysLayout, Scalars):
-            return ScalarsReference
-        if issubclass(PhysLayout, Constant):
-            return ConstantReference
+    def whatRef(PhysLayout , matrix):
+        if matrix.get_field() == 'real':
+            if issubclass(PhysLayout, Array):
+                return ArrayReference
+            if issubclass(PhysLayout, Scalars):
+                return ScalarsReference
+            if issubclass(PhysLayout, Constant):
+                return ConstantReference
+        elif matrix.get_field() == 'complex':
+            if issubclass(PhysLayout , Array):
+                return RowMajorInterArrayReference
         else:
             return None
     
@@ -656,18 +791,21 @@ class ExplicitPhysicalReference(Reference):
     def __getitem__(self, key):
         linIdx = self.getLinIdx(key)
         return self.physLayout[linIdx]
-    
 
+#associates matrices(mathematical concept) to physical storage
 class ArrayReference(ExplicitPhysicalReference):
     def __init__(self, matrix, physLayout):
         super(ArrayReference, self).__init__(matrix, physLayout)
-    
+
+    #mathematically we access element at i,j : this function maps this to a linear index in the physical storage of this matrix
     def getLinIdx(self, key):
-        idx = copy(self.matrix.getOrigin())
+        idx = copy(self.matrix.getOrigin()) #get the index of the origin - again this is a logical concept
+        #when would the origin not be 0,0?
+        #cause matrix is just a logical concept - so it should be that the origin is at 0,0
         idx[0] += key[0]
         idx[1] += key[1]
         
-        return idx[0]*self.physLayout.pitch + idx[1]
+        return idx[0]*self.physLayout.pitch + idx[1] #in any event this returns the linear index that the element is at in the physical storage(array)
         
     def pointerAt(self, key):
 #         idx = copy(self.matrix.getOrigin())
@@ -690,11 +828,36 @@ class ArrayReference(ExplicitPhysicalReference):
 #         linIdx = self.getLinIdx(key)
 #         return self.physLayout[linIdx]
 
+#design choice : should this extend ArrayReference or ExplicitPhysicalReference
+class RowMajorInterArrayReference(ExplicitPhysicalReference):
+    def __init__(self , matrix , physLayout):
+        super(RowMajorInterArrayReference , self).__init__(matrix , physLayout)
+
+    #the new getLinIdx function
+    def getLinIdx(self , key):
+        idx = copy(self.matrix.getOrigin())
+        idx[0] += key[0]
+        idx[1] += key[1]
+        selection = key[2] # 0 for the real part , 1 for the imaginary part
+        block_size = 4 #this is under consideration
+        block_num = idx[1] / block_size
+        e = idx[1] % block_size
+        return (idx[0] * self.physLayout.pitch) + (2 * block_size * block_num) + e + (selection * block_size)
+
+    def pointerAt(self , key):
+        linIdx = self.getLinIdx(key)
+        return self.physLayout.pointerAt(linIdx)
+
+    def isCorner(self , key):
+        linIdx = self.getLinIdx(key)
+        return self.physLayout.size-1 == linIdx
+
 class ScalarsReference(ExplicitPhysicalReference):
     def __init__(self, matrix, physLayout):
         super(ScalarsReference, self).__init__(matrix, physLayout)
 
     def getLinIdx(self, key):
+        #this method will need to change at some point
         idx = copy(self.matrix.getOrigin())
         idx[0] += key[0]
         idx[1] += key[1]
@@ -719,11 +882,14 @@ class ScalarsReference(ExplicitPhysicalReference):
 
 def getReference(context, matrix):
     '''Get physical layout reference.'''
-    if not context.bindingTable.isBound(matrix):
+    if not context.bindingTable.isBound(matrix): #is the matrix bound to some physical layout?
         return None
-    physLayout = context.bindingTable.getPhysicalLayout(matrix)
-    Ref = Reference.whatRef(physLayout.__class__)
-    return Ref(matrix, physLayout)
+    physLayout = context.bindingTable.getPhysicalLayout(matrix) # retrieve its physical layout #if i need to add complex matrices then the matrix needs to be of a different physical layout
+    #changed from a static method - the question is why exactly? Didn't really get that
+    #you could still make it static and pass the matrix as a parameter
+    #this way you could query the field of the matrix and return the right Reference type
+    Ref = Reference.whatRef(physLayout.__class__ , matrix) #what kind of reference object will it be?
+    return Ref(matrix, physLayout) #return an object of the correct reference type passing arguments: matrix and the retrieved physical layout
 
 ###################################################################################
 

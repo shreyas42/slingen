@@ -2187,7 +2187,7 @@ class NewGenerator(StructuresGenerator):
             #             if s0Params['nuable'] and s1Params['nuable'] and dParams['nuable']:
             #will probably have to add the fma mapping to the self.nublac
             if is_fused:
-                block.instructions += self.nublac.Fma(s0Params , s1Params , s2Params , dParams , opts)
+                block.instructions += self.nublac.CompFma(s0Params , s1Params , s2Params , dParams , opts)
             else:
                 block.instructions += self.nublac.Add(s0Params, s1Params, dParams, opts)
             #             else:
@@ -2358,7 +2358,7 @@ class NewGenerator(StructuresGenerator):
                 block.instructions += self.Load([dParams], opts)
                 #added code
                 if is_fused:
-                    block.instructions += self.nublac.Fma(subParams1 , subParams2 , dParams , dParams , opts)
+                    block.instructions += self.nublac.CompFma(subParams1 , subParams2 , dParams , dParams , opts)
                 else:
                     if expr.neg:
                         block.instructions += self.nublac.Sub(dParams, subParams, dParams, opts)
