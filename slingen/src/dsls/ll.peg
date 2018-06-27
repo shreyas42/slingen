@@ -12,7 +12,7 @@ program =
 
 declaration = (vartype:"Scalar" name:id "<" iotype:io ">" ";")
             | (vartype:"Vector" name:id dims:dim_vector "<" iotype:io ["," ow:ow] ">" ";")
-            | (vartype:"Matrix" name:id dims:dim_matrix "<" iotype:io { "," props+:prop } ["," ow:ow] ">" ";") 
+            | (vartype:"Matrix" name:id dims:dim_matrix "<" iotype:io { "," props+:prop } ["," field:fieldtype] ["," ow:ow] ">" ";")
             ;
 
 dim_vector = 
@@ -31,6 +31,12 @@ prop = @:"Square" | @:"Rectangular"
      | @:"LowerStorage" | @: "UpperStorage" 
      ;
 
+fieldtype = ("Complex" storageformat)
+    | "Real"
+    ;
+
+storageformat = "Split" | "BlkInterLeaved"
+    ;
 ow = "overwrites" "(" @:id ")" 
 	;
 

@@ -1,4 +1,4 @@
-# 2017-08-18 10:44:14.284057
+# 2018-06-27 10:03:50.464401
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
@@ -14,7 +14,7 @@ from grako.parsing import *  # noqa
 from grako.exceptions import *  # noqa
 
 
-__version__ = '17.230.08.44.14'
+__version__ = '18.178.14.03.50'
 
 
 class llParser(Parser):
@@ -85,6 +85,10 @@ class llParser(Parser):
                     self._closure(block12)
                     with self._optional():
                         self._token(',')
+                        self._fieldtype_()
+                        self.ast['field'] = self.last_node
+                    with self._optional():
+                        self._token(',')
                         self._ow_()
                         self.ast['ow'] = self.last_node
                     self._token('>')
@@ -137,9 +141,6 @@ class llParser(Parser):
                 self._token('tInOut')
             self._error('expecting one of: Input tInput tInOut tOutput InOut Output')
 
-#gonna try something here
-#the goal is to add the ability to specify storage representation and type of matrix into the
-
     @rule_def
     def _prop_(self):
         with self._choice():
@@ -180,6 +181,26 @@ class llParser(Parser):
                 self._token('UpperStorage')
                 self.ast['@'] = self.last_node
             self._error('expecting one of: Rectangular UpperStorage SPD Square Non-singular Symmetric LowerTriangular UpperTriangular UnitDiagonal ImplicitUnitDiagonal Diagonal LowerStorage')
+
+    @rule_def
+    def _fieldtype_(self):
+        with self._choice():
+            with self._option():
+                with self._group():
+                    self._token('Complex')
+                    self._storageformat_()
+            with self._option():
+                self._token('Real')
+            self._error('expecting one of: Real')
+
+    @rule_def
+    def _storageformat_(self):
+        with self._choice():
+            with self._option():
+                self._token('Split')
+            with self._option():
+                self._token('BlkInterLeaved')
+            self._error('expecting one of: Split BlkInterLeaved')
 
     @rule_def
     def _ow_(self):
@@ -809,6 +830,12 @@ class llSemantics(object):
         return ast
 
     def prop(self, ast):
+        return ast
+
+    def fieldtype(self, ast):
+        return ast
+
+    def storageformat(self, ast):
         return ast
 
     def ow(self, ast):

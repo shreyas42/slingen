@@ -1,0 +1,5 @@
+Matrix A(@m,@k) <Input , Complex  BlkInterLeaved>;
+Matrix B(@k,@n) <Input , Complex  BlkInterLeaved>;
+Matrix C(@m,@n) <InOut , Complex  BlkInterLeaved>;
+
+C = A * B + C;

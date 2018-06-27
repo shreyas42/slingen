@@ -54,9 +54,10 @@ class ExplicitLayout(PhysicalLayout):
     
     def __repr__(self):
         return self.__str__()
-
+#going to be modifying the Array physical layout class
+#adding an attribute called 'field' which is a list which tells you whether the layout is associated to a particular storage format
 class Array(ExplicitLayout):
-    def __init__(self, name, size, opts, pitch=None, isIn=False, isOut=False, safelyScalarize=False):
+    def __init__(self, name, size, opts, pitch=None, isIn=False, isOut=False, safelyScalarize=False , field = None):
         super(Array, self).__init__(name, isIn, isOut, opts)
         if pitch is None:
             self.size = sympify(size[0]*size[1])
@@ -65,7 +66,15 @@ class Array(ExplicitLayout):
             self.pitch = sympify(pitch)
             self.size = sympify(size[0]*pitch)
         self.safelyScalarize = safelyScalarize
-        
+
+        if field is None:
+            self.field = 'RowMajor'
+        else:
+            self.field = field #this keeps track of which reference
+
+    def getField(self):
+        return self.field
+
     def declare(self, indent):
         res = indent + self.scalar + " " + self.name + "[" + str(self.size) + "];\n" if not self.safelyScalarize else ""
         return res

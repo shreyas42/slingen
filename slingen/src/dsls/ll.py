@@ -559,14 +559,14 @@ class llExtSemantics(llSemantics):
     
     def __init__(self, sizes=None, mDict=None, opts=None):
         super(llExtSemantics, self).__init__()
-        self.mDict = {} if not mDict else mDict
+        self.mDict = {} if not mDict else mDict #dictionary keeping track of all matices,scalars and vectors specified
         self.sizes = {} if not sizes else sizes
         self.opts = {} if not opts else opts
         
         self.curr_lhs_out = None
         
         self.stmtListStack = [ [] ]
-        self.stmtList = None
+        self.stmtList = None #list of statements mentioned in the experiment file
 #         self.eqList = []
         init_info = self.opts.get('init_info', {})
         self.indicesStack = [ init_info.get('indices', []) ]
@@ -628,7 +628,8 @@ class llExtSemantics(llSemantics):
 #                 access = USMatAccess
 #         return access
 
-    
+#will be modifying the llExtSemantics class now
+#the goal is to add a way to query the field of the matrix and what storageformat its gonna use
     def declaration(self, ast):
 #         varList = ast['name']
 #         self.checkMat(varList)
@@ -636,34 +637,36 @@ class llExtSemantics(llSemantics):
         var = ast['name']
         if var in self.mDict:
             exit("Parsing error > " + var + " already defined.")
-        self.mDict[var] = getattr(self, 'type'+ast['vartype'])(str(var), ast.get('dims', None), ast['iotype'], ast.get('props', []), ast.get('ow', None))
+        self.mDict[var] = getattr(self, 'type'+ast['vartype'])(str(var), ast.get('dims', None), ast['iotype'], ast.get('props', []) , ast.get('field' , []) , ast.get('ow', None))
         return ast
 
-    def typeScalar(self, var, dims, iotype, props, ow):
-        mAttr = self.buildMatAttr(dims, iotype, props, ow)
+    def typeScalar(self, var, dims, iotype, props, field, ow):
+        mAttr = self.buildMatAttr(dims, iotype, props, field , ow)
         return Scalar(var, scalar_block(), attr=mAttr)
 
-    def typeVector(self, var, dims, iotype, props, ow):
-        mAttr = self.buildMatAttr(dims, iotype, props, ow)
+    def typeVector(self, var, dims, iotype, props, field, ow):
+        mAttr = self.buildMatAttr(dims, iotype, props, field , ow)
         sM = self.numexprStack.pop()
         M = self.maximize_size(var, sM)
 #         sM = astVarType['attr'][0]
 #         M = str(sM) if is_number(sM) else self.sizes[sM]
         return Matrix(var, scalar_block(), (M,1), attr=mAttr)
     
-    def typeMatrix(self, var, dims, iotype, props, ow):
-        mAttr = self.buildMatAttr(dims, iotype, props, ow)
-
+    def typeMatrix(self, var, dims, iotype, props, field, ow):
+        mAttr = self.buildMatAttr(dims, iotype, props, field , ow)
+        ftype = 'real'
+        if mAttr['fieldinfo'][0] == 'Complex':
+            ftype = 'complex'
         sN = self.numexprStack.pop()
         sM = self.numexprStack.pop()
         M = self.maximize_size(var, sM, [0])
         N = self.maximize_size(var, sN, [1])
         
         Struct = self.matStruct(props, (M,N))
-        return Struct(var, scalar_block(), (M,N), attr=mAttr, access=self.matAccess(props))
+        return Struct(var, scalar_block(ftype), (M,N), attr=mAttr, access=self.matAccess(props))
 
-    def buildMatAttr(self, dims, iotype, props, ow):
-        attr = {'ckiotype': iotype, 'props': deepcopy(props), 'ow': ow}
+    def buildMatAttr(self, dims, iotype, props, field, ow):
+        attr = {'ckiotype': iotype, 'props': deepcopy(props), 'fieldinfo' : deepcopy(field), 'ow': ow}
         if ow is not None:
             self.mDict[ow].attr['o'] = True
         if dims is not None and 'id' in dims:

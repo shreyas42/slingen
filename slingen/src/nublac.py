@@ -25,7 +25,8 @@ class Allocator(object):
             subPhys = icode.bindingTable.getPhysicalLayout(subM)
             icode.bindingTable.addBinding(m, subPhys)
         else:
-            outPhys = Array(m.name, m.size, opts, safelyScalarize=opts['scarep'])
+            #changing this for now
+            outPhys = Array(m.name, m.size, opts, safelyScalarize=opts['scarep'] , field = 'BlkInterLeaved')
             if icode.bindingTable.addBinding(m, outPhys):
                 icode.declare += [outPhys]
     
@@ -66,8 +67,8 @@ class NuAllocator(Allocator):
         
         isCompact, isCorner = None, None
         if is_exp_phys_ref:
-            isCompact = (ref.getLinIdx([mL.of(M-1), mR.of(N-1)]) - ref.getLinIdx([mL.of(0), mR.of(0)])) == (M*N - 1)
-            isCorner = ref.isCorner([mL.of(M-1), mR.of(N-1)])
+            isCompact = (ref.getLinIdx([mL.of(M-1), mR.of(N-1) , 1]) - ref.getLinIdx([mL.of(0), mR.of(0) , 0])) == (M*N - 1)
+            isCorner = ref.isCorner([mL.of(M-1), mR.of(N-1) , 1])
         
         access = m.genAccess()
         

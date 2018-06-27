@@ -131,8 +131,9 @@ def prepareMake(opts):
         mkdir = "mkdir -p"
 #         mv = "mv"
         basefiles = opts['basefiles'] + [ opts['makefile'] ]        
+        #here's where the name of the tester is specified
         if 'libname' in opts  or not opts.get('gentester', True):
-            basefiles.append("testers/" + opts['hfilebasename'] + "_tester.h")
+            basefiles.append("testers/" + opts['hfilebasename'] + "_tester.h") #the question is how do I choose between testers if I dont know what the nature of the matrix is at this point
         platform = opts.get('platform', opts['arch'].__name__)
         basefiles.append('tsc/tsc_%s.cpp' % platform)
         origindir = opts['testroot'] + "/"

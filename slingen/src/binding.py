@@ -640,16 +640,24 @@ class EnhancedBinder(NewBinder):
         order_of_decl = nx.topological_sort(g, reverse=True)
         for name in order_of_decl:
             mat = mat_dict[name]
-            phys_size = mat.size
+
+            phys_size = list(mat.size)
             if mat.get_field() == 'complex':
                 phys_size[1] *= 2
+            phys_size = tuple(phys_size)
+
+            if mat.attr.get('fieldinfo' , None) is not None:
+                fieldParam = mat.attr['fieldinfo'][1]
+            else:
+                fieldParam = None
+
             if mat.attr.get('ow', None) is not None:
                 self.context.bindingTable.add_binding_overwrite(mat)
             else:
                 if not mat.attr['o'] and mat.isScalar():
                     physLayout = Scalars(mat.name, mat.size, opts, isIn=mat.attr['i'], isParam=True)
                 else:
-                    physLayout = Array(mat.name, phys_size, opts, isIn=mat.attr['i'], isOut=mat.attr['o'])
+                    physLayout = Array(mat.name, phys_size, opts, isIn=mat.attr['i'], isOut=mat.attr['o'] , field = fieldParam)
                 if self.context.bindingTable.addBinding(mat, physLayout):
                     if mat.attr['t']:
                         physLayout.safelyScalarize = opts['scarep']
@@ -665,11 +673,12 @@ class EnhancedBinder(NewBinder):
         getattr(self, expr.inexpr[0].__class__.__name__)(expr.inexpr[0], opts)
         getattr(self, expr.inexpr[1].__class__.__name__)(expr.inexpr[1], opts)
 
-        phys_size = out.size
+        phys_size = list(out.size)
         if out.get_field() == 'complex':
             phys_size[1] *= 2
-
-        outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'])
+        phys_size = tuple(phys_size)
+        #using the hackish way to get shit done , will have to change later
+        outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'] , field = 'BlkInterLeaved')
         if self.context.bindingTable.addBinding(out, outPhys):
             self.context.declare += [outPhys]
 
@@ -679,10 +688,12 @@ class EnhancedBinder(NewBinder):
             return
 
         getattr(self, expr.inexpr[0].__class__.__name__)(expr.inexpr[0], opts)
-        phys_size = out.size
+        phys_size = list(out.size)
         if out.get_field() == 'complex':
             phys_size[1] *= 2
-        outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'])
+        phys_size = tuple(phys_size)
+
+        outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'] , field = 'BlkInterLeaved')
         if self.context.bindingTable.addBinding(out, outPhys):
             self.context.declare += [outPhys]
 
@@ -698,10 +709,12 @@ class EnhancedBinder(NewBinder):
             if self.context.bindingTable.isBound(out):
                 return
             getattr(self, expr.inexpr[0].__class__.__name__)(expr.inexpr[0], opts)
-            phys_size = out.size
+            phys_size = list(out.size)
             if out.get_field() == 'complex':
                 phys_size[1] *= 2
-            outPhys = Array(out.name, phys_size, opts)
+            phys_size = tuple(phys_size)
+
+            outPhys = Array(out.name, phys_size, opts , field = 'BlkInterLeaved')
             if self.context.bindingTable.addBinding(out, outPhys):
                 self.context.declare += [outPhys]
 
@@ -714,10 +727,11 @@ class EnhancedBinder(NewBinder):
 
         sub = expr.getInexprMat(0)
         safelyScalarize = opts['scarep'] and sub.size[0] <= opts['nu'] and sub.size[1] <= opts['nu']
-        phys_size = out.size
+        phys_size = list(out.size)
         if out.get_field() == 'complex':
             phys_size[1] *= 2
-        outPhys = Array(out.name, phys_size, opts, safelyScalarize=safelyScalarize)
+        phys_size = tuple(phys_size)
+        outPhys = Array(out.name, phys_size, opts, safelyScalarize=safelyScalarize , field = 'BlkInterLeaved')
         if self.context.bindingTable.addBinding(out, outPhys):
             self.context.declare += [outPhys]
 
@@ -734,12 +748,13 @@ class EnhancedBinder(NewBinder):
 
         sub = expr.getInexprMat(0)
 
-        phys_size = out.size
+        phys_size = list(out.size)
         if out.get_field() == 'complex':
             phys_size[1] *= 2
+        phys_size = tuple(phys_size)
 
         if sub.size[0]*sub.size[1] <= opts['nu']*opts['nu']:
-            outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'])
+            outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'] , field = 'BlkInterLeaved')
             if self.context.bindingTable.addBinding(out, outPhys):
                 self.context.declare += [outPhys]
         else:
@@ -757,17 +772,18 @@ class Reference(object):
         self.physLayout = physLayout
 
     @staticmethod
-    def whatRef(PhysLayout , matrix):
-        if matrix.get_field() == 'real':
-            if issubclass(PhysLayout, Array):
-                return ArrayReference
-            if issubclass(PhysLayout, Scalars):
-                return ScalarsReference
-            if issubclass(PhysLayout, Constant):
-                return ConstantReference
-        elif matrix.get_field() == 'complex':
-            if issubclass(PhysLayout , Array):
+    def whatRef(PhysLayout):
+        if isinstance(PhysLayout, Array):
+            if PhysLayout.getField() == 'BlkInterLeaved':
                 return RowMajorInterArrayReference
+            elif PhysLayout.getField() == 'Split':
+                pass
+            else:
+                return ArrayReference
+        if isinstance(PhysLayout, Scalars):
+            return ScalarsReference
+        if isinstance(PhysLayout, Constant):
+            return ConstantReference
         else:
             return None
     
@@ -888,7 +904,7 @@ def getReference(context, matrix):
     #changed from a static method - the question is why exactly? Didn't really get that
     #you could still make it static and pass the matrix as a parameter
     #this way you could query the field of the matrix and return the right Reference type
-    Ref = Reference.whatRef(physLayout.__class__ , matrix) #what kind of reference object will it be?
+    Ref = Reference.whatRef(physLayout) #what kind of reference object will it be?
     return Ref(matrix, physLayout) #return an object of the correct reference type passing arguments: matrix and the retrieved physical layout
 
 ###################################################################################
