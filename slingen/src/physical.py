@@ -75,6 +75,9 @@ class Array(ExplicitLayout):
     def getField(self):
         return self.field
 
+    def getSize(self):
+        return self.size - 1
+
     def declare(self, indent):
         res = indent + self.scalar + " " + self.name + "[" + str(self.size) + "];\n" if not self.safelyScalarize else ""
         return res

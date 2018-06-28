@@ -454,8 +454,18 @@ class Access(object):
         #what does this method do?
 #         return { 'pList': [ self.pointer ], 'th': [self.inlen] }
         ref = getReference(icode, self.pointer.mat)
+
+        physLayout = icode.bindingTable.getPhysicalLayout(self.pointer.mat)
+        is_complex_layout = False
+        if physLayout.getField() == 'BlkInterLeaved' or physLayout.getField() == 'Split':
+            is_complex_layout = True
+
         l_mrmap = len(self.mrmap)
-        corner = (self.pointer.at[0], self.pointer.at[1]+l_mrmap , 1) if self.horizontal else (self.pointer.at[0]+l_mrmap, self.pointer.at[1])
+        if is_complex_layout:
+            corner = (self.pointer.at[0], self.pointer.at[1]+l_mrmap , 1) if self.horizontal else (self.pointer.at[0]+l_mrmap, self.pointer.at[1])
+        else:
+            corner = (self.pointer.at[0], self.pointer.at[1]+l_mrmap) if self.horizontal else (self.pointer.at[0]+l_mrmap, self.pointer.at[1])
+
         is_compact = (ref.getLinIdx(corner) - self.pointer.linIdx) == l_mrmap
 
         if self.horizontal or is_compact:

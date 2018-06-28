@@ -63,13 +63,25 @@ class NuAllocator(Allocator):
             self.reshape(m, M, N, bounds, opts)
 
         ref = getReference(icode, m)
+        #change added here
+        physLayout = icode.bindingTable.getPhysicalLayout(m)
         is_exp_phys_ref = isinstance(ref, ExplicitPhysicalReference)
-        
+
+        is_complex_layout = False
+        if physLayout.getField() == 'BlkInterLeaved' or physLayout.getField() == 'Split':
+            is_complex_layout = True
+
         isCompact, isCorner = None, None
         if is_exp_phys_ref:
-            isCompact = (ref.getLinIdx([mL.of(M-1), mR.of(N-1) , 1]) - ref.getLinIdx([mL.of(0), mR.of(0) , 0])) == (M*N - 1)
-            isCorner = ref.isCorner([mL.of(M-1), mR.of(N-1) , 1])
-        
+            if is_complex_layout:
+            #changed the two lines below , this needs to actually reflect what kind of Reference it is
+                isCompact = (ref.getLinIdx([mL.of(M-1), mR.of(N-1) , 1]) - ref.getLinIdx([mL.of(0), mR.of(0) , 0])) == physLayout.getSize()
+                isCorner = ref.isCorner([mL.of(M-1), mR.of(N-1) , 1])
+            else:
+                isCompact = (ref.getLinIdx([mL.of(M-1), mR.of(N-1)]) - ref.getLinIdx([mL.of(0), mR.of(0)])) == physLayout.getSize()
+                isCorner = ref.isCorner([mL.of(M-1), mR.of(N-1)])
+
+
         access = m.genAccess()
         
         nu = opts['nu']

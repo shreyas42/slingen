@@ -851,12 +851,14 @@ class RowMajorInterArrayReference(ExplicitPhysicalReference):
 
     #the new getLinIdx function
     def getLinIdx(self , key):
+        import sympy
         idx = copy(self.matrix.getOrigin())
         idx[0] += key[0]
         idx[1] += key[1]
         selection = key[2] # 0 for the real part , 1 for the imaginary part
         block_size = 4 #this is under consideration
-        block_num = idx[1] / block_size
+        #this statement is problematic
+        block_num = sympy.floor(idx[1] / block_size)
         e = idx[1] % block_size
         return (idx[0] * self.physLayout.pitch) + (2 * block_size * block_num) + e + (selection * block_size)
 
