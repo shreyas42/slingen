@@ -457,7 +457,8 @@ class Access(object):
 
         physLayout = icode.bindingTable.getPhysicalLayout(self.pointer.mat)
         is_complex_layout = False
-        if physLayout.getField() == 'BlkInterLeaved' or physLayout.getField() == 'Split':
+        #the question is do I query the physicallayout or do i query the reference itself?
+        if physLayout.getField() in ['BlkInterLeaved','Split']:
             is_complex_layout = True
 
         l_mrmap = len(self.mrmap)

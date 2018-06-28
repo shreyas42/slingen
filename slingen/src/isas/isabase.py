@@ -126,7 +126,8 @@ class ISAManager(object):
                 if 'loadreplacer' in isa.types['fp'][(prec, nu)]:
                     return isa.types['fp'][(prec, nu)]['loadreplacer']
         return None
-        
+    #may have to override this later
+    #for now you remain
     def getNuTypeDict(self, t, prec):
         nuTypesDict = {}
         for isa in self.isaList:
@@ -135,7 +136,7 @@ class ISAManager(object):
                 if prec_nu[0] == prec and not prec_nu[1] in nuTypesDict:
                     nuTypesDict[prec_nu[1]] = isaFp[prec_nu]['type']
         return nuTypesDict
-        
+    #this also remains untouched for now
     def getStore(self, t, regnu, memnu, prec, horizontal=True, isAligned=False):
         for isa in self.isaList:
             if (prec,regnu) in isa.types[t]:
@@ -143,7 +144,8 @@ class ISAManager(object):
                     if store.canStore(regnu, memnu, horizontal, isAligned):
                         return store
         return None
-    
+
+    #this also remains as it is
     def get_add_func_defs(self):
         res = []
         for isa in self.isaList:
@@ -153,3 +155,34 @@ class ISAManager(object):
     
     def __str__(self):
         return str(self.isaList)
+
+class EnhancedISAManager(ISAManager):
+    def __init__(self , isaList):
+        super(EnhancedISAManager , self).__init__(isaList)
+
+    def getNuBLAC(self, prec, nu , field = 'real'):
+        for isa in self.isalist:
+            if(field , prec , nu) in isa.types['fp']:
+                if 'nublac' in isa.types['fp'][(field , prec , nu)]:
+                    return isa.types['fp'][(field , prec , nu)]['nublac']
+
+    def getLoader(self, prec, nu , field = 'real'):
+        for isa in self.isaList:
+            if (field , prec, nu) in isa.types['fp']:
+                if 'loader' in isa.types['fp'][(field , prec, nu)]:
+                    return isa.types['fp'][(field , prec, nu)]['loader']
+        return None
+
+    def getStorer(self, prec, nu, field = 'real'):
+        for isa in self.isaList:
+            if (field , prec, nu) in isa.types['fp']:
+                if 'storer' in isa.types['fp'][(field , prec, nu)]:
+                    return isa.types['fp'][(field , prec, nu)]['storer']
+        return None
+
+    def getLoadReplacer(self, field , prec, nu):
+        for isa in self.isaList:
+            if (prec, nu) in isa.types['fp']:
+                if 'loadreplacer' in isa.types['fp'][(field , prec, nu)]:
+                    return isa.types['fp'][(field , prec, nu)]['loadreplacer']
+        return None

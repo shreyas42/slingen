@@ -68,7 +68,7 @@ class NuAllocator(Allocator):
         is_exp_phys_ref = isinstance(ref, ExplicitPhysicalReference)
 
         is_complex_layout = False
-        if physLayout.getField() == 'BlkInterLeaved' or physLayout.getField() == 'Split':
+        if physLayout.getField() in ['BlkInterLeaved','Split']:
             is_complex_layout = True
 
         isCompact, isCorner = None, None
