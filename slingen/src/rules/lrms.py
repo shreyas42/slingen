@@ -173,8 +173,13 @@ class HOfflineLRM(LRM):
         super(HOfflineLRM, self).__init__(measMgr, opts)
 #         self.roots = [expr.getHolograph()]
         self.rank_by_variants = {}
-        
-        self.nublac = opts['isaman'].getNuBLAC(opts['precision'], opts['nu'])
+
+        if 'field' in opts.keys():
+            self.nublac = opts['isaman'].getNuBLAC(opts['precision'], opts['nu'] , opts['field'])
+
+        else:
+            self.nublac = opts['isaman'].getNuBLAC(opts['precision'], opts['nu'])
+
         self.rs_sca = rs_list[0]
 
         self.random = opts['random']
@@ -439,7 +444,11 @@ class HOfflineLRM(LRM):
             
         
     def algogen(self, init_llprog):
-        nublac = self.opts['isaman'].getNuBLAC(self.opts['precision'], self.opts['nu'])
+        if 'field' in self.opts.keys():
+            nublac = self.opts['isaman'].getNuBLAC(self.opts['precision'], self.opts['nu'] , self.opts['field'])
+        else:
+            nublac = self.opts['isaman'].getNuBLAC(self.opts['precision'], self.opts['nu'])
+
         v, vv = 0, 0
         llprogs = []
         llprog = None

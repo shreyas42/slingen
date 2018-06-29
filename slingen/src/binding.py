@@ -646,7 +646,7 @@ class EnhancedBinder(NewBinder):
                 phys_size[1] *= 2
             phys_size = tuple(phys_size)
 
-            if mat.attr.get('fieldinfo' , None) is not None:
+            if mat.attr.get('fieldinfo' , None) is not None and len(mat.attr['fieldinfo']) > 1:
                 fieldParam = mat.attr['fieldinfo'][1]
             else:
                 fieldParam = None
@@ -672,13 +672,18 @@ class EnhancedBinder(NewBinder):
 
         getattr(self, expr.inexpr[0].__class__.__name__)(expr.inexpr[0], opts)
         getattr(self, expr.inexpr[1].__class__.__name__)(expr.inexpr[1], opts)
-
+        is_complex = False
         phys_size = list(out.size)
         if out.get_field() == 'complex':
             phys_size[1] *= 2
+            is_complex = True
         phys_size = tuple(phys_size)
         #using the hackish way to get shit done , will have to change later
-        outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'] , field = 'BlkInterLeaved')
+        if is_complex:
+            outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'] , field = 'BlkInterLeaved')
+        else:
+            outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'])
+
         if self.context.bindingTable.addBinding(out, outPhys):
             self.context.declare += [outPhys]
 
@@ -689,11 +694,17 @@ class EnhancedBinder(NewBinder):
 
         getattr(self, expr.inexpr[0].__class__.__name__)(expr.inexpr[0], opts)
         phys_size = list(out.size)
+        is_complex = False
         if out.get_field() == 'complex':
             phys_size[1] *= 2
+            is_complex = True
         phys_size = tuple(phys_size)
 
-        outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'] , field = 'BlkInterLeaved')
+        if is_complex:
+            outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'] , field = 'BlkInterLeaved')
+        else:
+            outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'])
+
         if self.context.bindingTable.addBinding(out, outPhys):
             self.context.declare += [outPhys]
 
@@ -710,11 +721,15 @@ class EnhancedBinder(NewBinder):
                 return
             getattr(self, expr.inexpr[0].__class__.__name__)(expr.inexpr[0], opts)
             phys_size = list(out.size)
+            is_complex = False
             if out.get_field() == 'complex':
                 phys_size[1] *= 2
+                is_complex = True
             phys_size = tuple(phys_size)
-
-            outPhys = Array(out.name, phys_size, opts , field = 'BlkInterLeaved')
+            if is_complex:
+                outPhys = Array(out.name, phys_size, opts , field = 'BlkInterLeaved')
+            else:
+                outPhys = Array(out.name, phys_size, opts)
             if self.context.bindingTable.addBinding(out, outPhys):
                 self.context.declare += [outPhys]
 
@@ -728,10 +743,16 @@ class EnhancedBinder(NewBinder):
         sub = expr.getInexprMat(0)
         safelyScalarize = opts['scarep'] and sub.size[0] <= opts['nu'] and sub.size[1] <= opts['nu']
         phys_size = list(out.size)
+        is_complex = False
         if out.get_field() == 'complex':
             phys_size[1] *= 2
+            is_complex = True
         phys_size = tuple(phys_size)
-        outPhys = Array(out.name, phys_size, opts, safelyScalarize=safelyScalarize , field = 'BlkInterLeaved')
+
+        if is_complex:
+            outPhys = Array(out.name, phys_size, opts, safelyScalarize=safelyScalarize , field = 'BlkInterLeaved')
+        else:
+            outPhys = Array(out.name, phys_size, opts, safelyScalarize=safelyScalarize)
         if self.context.bindingTable.addBinding(out, outPhys):
             self.context.declare += [outPhys]
 
@@ -749,16 +770,25 @@ class EnhancedBinder(NewBinder):
         sub = expr.getInexprMat(0)
 
         phys_size = list(out.size)
+        is_complex = False
         if out.get_field() == 'complex':
             phys_size[1] *= 2
+            is_complex = True
         phys_size = tuple(phys_size)
 
         if sub.size[0]*sub.size[1] <= opts['nu']*opts['nu']:
-            outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'] , field = 'BlkInterLeaved')
+            if is_complex:
+                outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'] , field = 'BlkInterLeaved')
+            else:
+                outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'])
             if self.context.bindingTable.addBinding(out, outPhys):
                 self.context.declare += [outPhys]
         else:
-            outPhys = Array(out.name, phys_size, opts)
+            if is_complex:
+                outPhys = Array(out.name, phys_size, opts , field = 'BlkInterLeaved')
+            else:
+                outPhys = Array(out.name, phys_size, opts)
+
             if self.context.bindingTable.addBinding(out, outPhys):
                 self.context.declare += [outPhys]
 

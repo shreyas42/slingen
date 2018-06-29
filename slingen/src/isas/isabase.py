@@ -161,7 +161,7 @@ class EnhancedISAManager(ISAManager):
         super(EnhancedISAManager , self).__init__(isaList)
 
     def getNuBLAC(self, prec, nu , field = 'real'):
-        for isa in self.isalist:
+        for isa in self.isaList:
             if(field , prec , nu) in isa.types['fp']:
                 if 'nublac' in isa.types['fp'][(field , prec , nu)]:
                     return isa.types['fp'][(field , prec , nu)]['nublac']

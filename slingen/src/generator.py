@@ -2133,8 +2133,21 @@ class StructuresGenerator(Generator):
 #the temp_slingen will now be using this as the default code generator
 
 class NewGenerator(StructuresGenerator):
-    def __init__(self , sllprog , opts):
-        super(NewGenerator , self).__init__( sllprog , opts)
+    def __init__(self, sllprog, opts):
+
+        if 'field' in opts.keys():
+            self.nublac = opts['isaman'].getNuBLAC(opts['precision'], opts['nu'] , opts['field'])
+            self.scablac = opts['isaman'].getNuBLAC(opts['precision'], 1 , opts['field'])
+        else:
+            self.nublac = opts['isaman'].getNuBLAC(opts['precision'], opts['nu'])
+            self.scablac = opts['isaman'].getNuBLAC(opts['precision'], 1)
+
+        self.allocator = NeonAllocator() if ARMv7 in opts['isaman'].isaList else NuAllocator()
+        #         self.genBlock(sllprog.stmtList, opts)
+        self.genStructConstruct(sllprog, opts)
+        for b in sllprog.stmtList:
+            setstr = '{[ '+(','.join(b.ann['indices']))+' ]}'
+            getattr(self, b.__class__.__name__)(b, opts, genopts={'setComp': True, 'indices': b.ann['indices'], 'iterset': Set(setstr)}, bounds={}, context=icode)
 
     #overriding the Add and Mul methods for the New structure generator
 
@@ -2187,7 +2200,7 @@ class NewGenerator(StructuresGenerator):
             #             if s0Params['nuable'] and s1Params['nuable'] and dParams['nuable']:
             #will probably have to add the fma mapping to the self.nublac
             if is_fused:
-                block.instructions += self.nublac.CompFma(s0Params , s1Params , s2Params , dParams , opts)
+                block.instructions += self.nublac.Fma(s0Params , s1Params , s2Params , dParams , opts)
             else:
                 block.instructions += self.nublac.Add(s0Params, s1Params, dParams, opts)
             #             else:
@@ -2358,7 +2371,7 @@ class NewGenerator(StructuresGenerator):
                 block.instructions += self.Load([dParams], opts)
                 #added code
                 if is_fused:
-                    block.instructions += self.nublac.CompFma(subParams1 , subParams2 , dParams , dParams , opts)
+                    block.instructions += self.nublac.Fma(subParams1 , subParams2 , dParams , dParams , opts)
                 else:
                     if expr.neg:
                         block.instructions += self.nublac.Sub(dParams, subParams, dParams, opts)

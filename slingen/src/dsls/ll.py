@@ -85,7 +85,12 @@ class llStmt(object):
         return self.eq.get_pot_zero_dims() 
 
     def computeSpaceIdxNames(self, opts, depth=1, baselevel=2):
-        nublac = opts['isaman'].getNuBLAC(opts['precision'], opts['nu'])
+
+        if 'field' in opts.keys():
+            nublac = opts['isaman'].getNuBLAC(opts['precision'], opts['nu'] , opts['field'])
+        else:
+            nublac = opts['isaman'].getNuBLAC(opts['precision'], opts['nu'])
+
         if not self.can_gen_with_nublac(nublac):
             baselevel = 2
         self.eq.computeSpaceIdxNames(i='i',j='j', ipfix=str(globalSSAIndex()), jpfix=str(globalSSAIndex()), opts=opts, depth=depth, baselevel=baselevel)
@@ -637,7 +642,7 @@ class llExtSemantics(llSemantics):
         var = ast['name']
         if var in self.mDict:
             exit("Parsing error > " + var + " already defined.")
-        self.mDict[var] = getattr(self, 'type'+ast['vartype'])(str(var), ast.get('dims', None), ast['iotype'], ast.get('props', []) , ast.get('field' , []) , ast.get('ow', None))
+        self.mDict[var] = getattr(self, 'type'+ast['vartype'])(str(var), ast.get('dims', None), ast['iotype'], ast.get('props', []) , ast.get('field' , None) , ast.get('ow', None))
         return ast
 
     def typeScalar(self, var, dims, iotype, props, field, ow):
@@ -666,7 +671,11 @@ class llExtSemantics(llSemantics):
         return Struct(var, scalar_block(ftype), (M,N), attr=mAttr, access=self.matAccess(props))
 
     def buildMatAttr(self, dims, iotype, props, field, ow):
-        attr = {'ckiotype': iotype, 'props': deepcopy(props), 'fieldinfo' : deepcopy(field), 'ow': ow}
+        attr = {'ckiotype': iotype, 'props': deepcopy(props), 'ow': ow}
+        if field is not None:
+            attr['fieldinfo'] = deepcopy(field)
+        else:
+            attr['fieldinfo'] = ['Real']
         if ow is not None:
             self.mDict[ow].attr['o'] = True
         if dims is not None and 'id' in dims:

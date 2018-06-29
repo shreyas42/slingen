@@ -654,9 +654,11 @@ class ToPolySigma(object):
 #         self.globIdxOrder = []
         self.subsWithOut = {}
         self.sigmaSource = ""
-        
-        self.nublac = self.opts['isaman'].getNuBLAC(self.opts['precision'], self.opts['nu'])
-        
+        if 'field' in self.opts.keys():
+            self.nublac = self.opts['isaman'].getNuBLAC(self.opts['precision'], self.opts['nu'] , self.opts['field'])
+        else:
+            self.nublac = self.opts['isaman'].getNuBLAC(self.opts['precision'], self.opts['nu'])
+
         self.baselevel = 3 if self.opts['useintrinsics'] else 2 # Mat level
 #         if 'baseufs' not in self.opts: 
         self.opts['baseufs'] = { }
