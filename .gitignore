@@ -1,4 +1,4 @@
-libs
+./libs
 output
 py27env
 py35env
