@@ -1,7 +1,7 @@
-/libs/
-/output/
-/py27env/
-/py35env/
-/slingen/sigmacloog.so
-/compileroot
+/libs
+output/
+py27env/
+py35env/
+slingen/sigmacloog.so
+compileroot
 *.pyc
