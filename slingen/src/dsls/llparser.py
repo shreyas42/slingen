@@ -1,4 +1,4 @@
-# 2018-06-27 10:03:50.464401
+# 2018-06-27 10:00:37.919134
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
@@ -14,7 +14,7 @@ from grako.parsing import *  # noqa
 from grako.exceptions import *  # noqa
 
 
-__version__ = '18.178.14.03.50'
+__version__ = '18.178.14.00.37'
 
 
 class llParser(Parser):
@@ -86,7 +86,7 @@ class llParser(Parser):
                     with self._optional():
                         self._token(',')
                         self._fieldtype_()
-                        self.ast['field'] = self.last_node
+                        self.ast.add_list('field', self.last_node)
                     with self._optional():
                         self._token(',')
                         self._ow_()
