@@ -44,8 +44,9 @@ if __name__ == '__main__':
 
     experiments = [
 
-        ('gemm_complex',testing1toNParam, [(16, 16, 8), [('m', lambda N: N), ('k', lambda N: N), ('n', lambda N: N)] ], 'gemm_complex-4-124-24') ,
-       ('gemm',testing1toNParam, [(16, 16, 8), [('m', lambda N: N), ('k', lambda N: N), ('n', lambda N: N)] ], 'gemm-4-124-24')
+#        ('gemm_complex',testing1toNParam, [(16, 16, 8), [('m', lambda N: N), ('k', lambda N: N), ('n', lambda N: N)] ], 'gemm_complex-4-124-24') ,
+#       ('gemm',testing1toNParam, [(4, 4, 8), [('m', lambda N: N), ('k', lambda N: N), ('n', lambda N: N)] ], 'gemm-4-124-24') ,
+        ('trsyl', testing1toNParam, [(4, 4, 24), [('m', lambda n: n), ('n', lambda n: n)]], 'trsyl-4-124-24')
 
     ]
 

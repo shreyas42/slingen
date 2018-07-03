@@ -25,8 +25,14 @@ class Allocator(object):
             subPhys = icode.bindingTable.getPhysicalLayout(subM)
             icode.bindingTable.addBinding(m, subPhys)
         else:
-            #changing this for now
-            outPhys = Array(m.name, m.size, opts, safelyScalarize=opts['scarep'] , field = 'BlkInterLeaved')
+            #changing this for now : MARKER
+            is_complex = False
+            if m.get_field() == 'Complex':
+                is_complex = True
+            if is_complex:
+                outPhys = Array(m.name, m.size, opts, safelyScalarize=opts['scarep'], field = 'BlkInterLeaved')
+            else:
+                outPhys = Array(m.name, m.size, opts, safelyScalarize=opts['scarep'])
             if icode.bindingTable.addBinding(m, outPhys):
                 icode.declare += [outPhys]
     
@@ -96,6 +102,7 @@ class NuAllocator(Allocator):
 
         if (opts['useintrinsics'] or not is_exp_phys_ref) and M == 1 and N == 1:
             nuMM, nuMN = nu if scaColExt else 1, nu if scaRowExt else 1
+            #change here
             nuM = Matrix('', scalar_block(), (nuMM,nuMN))
             nuML, nuMR = nuM.fL, nuM.fR
             self.declare(nuM, subNuM, opts)
