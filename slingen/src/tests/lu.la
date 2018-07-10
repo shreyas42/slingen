@@ -1,0 +1,5 @@
+Matrix L(@m,@m) <Input, LowerTriangular>;
+Matrix U(@m,@m) <Input, UpperTriangular>;
+Matrix C(@m,@m) <InOut>;
+
+C = L*U + C;

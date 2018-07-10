@@ -27,7 +27,7 @@ class Allocator(object):
         else:
             #changing this for now : MARKER
             is_complex = False
-            if m.get_field() == 'Complex':
+            if m.get_field() == 'complex':
                 is_complex = True
             if is_complex:
                 outPhys = Array(m.name, m.size, opts, safelyScalarize=opts['scarep'], field = 'BlkInterLeaved')
@@ -102,8 +102,12 @@ class NuAllocator(Allocator):
 
         if (opts['useintrinsics'] or not is_exp_phys_ref) and M == 1 and N == 1:
             nuMM, nuMN = nu if scaColExt else 1, nu if scaRowExt else 1
-            #change here
-            nuM = Matrix('', scalar_block(), (nuMM,nuMN))
+            #change here : IMPORTANT CHANGE
+            if is_complex_layout:
+                nuM = Matrix('', scalar_block('complex'), (nuMM,nuMN))
+            else:
+                nuM = Matrix('', scalar_block(), (nuMM,nuMN))
+
             nuML, nuMR = nuM.fL, nuM.fR
             self.declare(nuM, subNuM, opts)
         elif is_exp_phys_ref and (not opts['useintrinsics'] or (M == nu and N == nu and isnuGeMat) or (M == 1 and N == nu) or (M == nu and N == 1 and isCompact)):
@@ -112,17 +116,29 @@ class NuAllocator(Allocator):
             nuM = m
         elif M == 1 and N < nu:
             nuMM, nuMN = nu if colExt else 1, nu
-            nuM = Matrix('', scalar_block(), (nuMM,nuMN))
+            if is_complex_layout:
+                nuM = Matrix('', scalar_block('complex'), (nuMM,nuMN))
+            else:
+                nuM = Matrix('', scalar_block(), (nuMM,nuMN))
+
             nuML, nuMR = nuM.fL, nuM.fR
             self.declare(nuM, subNuM, opts)
         elif M <= nu and N == 1:
             nuMM, nuMN = nu, nu if rowExt else 1
-            nuM = Matrix('', scalar_block(), (nuMM,nuMN))
+            if is_complex_layout:
+                nuM = Matrix('', scalar_block('complex'), (nuMM,nuMN))
+            else:
+                nuM = Matrix('', scalar_block(), (nuMM,nuMN))
+
             nuML, nuMR = nuM.fL, nuM.fR
             self.declare(nuM, subNuM, opts)
         else:
             nuMM, nuMN = nu, nu
-            nuM = Matrix('', scalar_block(), (nu,nu))
+            if is_complex_layout:
+                nuM = Matrix('', scalar_block('complex'), (nu,nu))
+            else:
+                nuM = Matrix('', scalar_block(), (nu,nu))
+
             nuML, nuMR = nuM.fL, nuM.fR
             self.declare(nuM, subNuM, opts)
         

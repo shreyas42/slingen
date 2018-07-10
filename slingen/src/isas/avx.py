@@ -3967,7 +3967,8 @@ class AVX(ISA):
 
 
         #changing the format of the type - now a triplet instead of a pair
-        self.types = { 'fp': { ('real' , 'double' , 4): re_fp_m256d , ('complex' , 'double' , 4) : cm_fp_m256d , ('real' , 'float' , 8): re_fp_m256 , ('complex' , 'float' , 8) : cm_fp_m256} }
-        #self.types = { 'fp': { ('double' , 4): fp_m256d  , ('float' , 8): fp_m256 } }
+#        self.types = { 'fp': { ('real' , 'double' , 4): re_fp_m256d , ('complex' , 'double' , 4) : cm_fp_m256d , ('real' , 'float' , 8): re_fp_m256 , ('complex' , 'float' , 8) : cm_fp_m256} }
+#        self.types = { 'fp': { ('double' , 4): re_fp_m256d  , ('float' , 8): re_fp_m256 } }
+        self.types = { 'fp': { ('double' , 4 , 'real'): re_fp_m256d  , ('float' , 8, 'real'): re_fp_m256 , ('double' , 4 , 'complex'): cm_fp_m256d  , ('float' , 8, 'complex'): cm_fp_m256 } }
 
         self.add_func_defs = [ asm256LoaduPd, asm256StoreuPd ]

@@ -2147,7 +2147,16 @@ def applyScaRep(context, counter, opts, arrMap=None, neighbor_ctx_pot_mod=None, 
             for nu in unifiedLists.keys():
                 if len(unifiedLists[nu]) > 0:
                     cid = counter.next()
-                    scaMat = Matrix("_T" + str(cid), scalar_block(), (1, len(unifiedLists[nu])))
+                    #so the complex scalar replacement works even without changing this
+                    #so the question is does this really need to change?
+                    #or primarily , what scMat really respnosible for?
+
+                    if 'field' in opts.keys():
+                        if opts['field'] == 'complex':
+                            scaMat = Matrix("_T" + str(cid), scalar_block(opts['field']), (1, len(unifiedLists[nu])))
+
+                    else:
+                        scaMat = Matrix("_T" + str(cid), scalar_block(), (1, len(unifiedLists[nu])))
                     physLayout = Scalars("_t" + str(cid)+"_", scaMat.size, opts, ctx=context, vtype=types[nu]) # vtype is retrieved from the ISA definition
                     # for now let's stick to a unified table stored in the top-level context (icode) 
                     icode.bindingTable.addBinding(scaMat, physLayout)

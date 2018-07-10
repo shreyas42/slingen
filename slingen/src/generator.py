@@ -2170,7 +2170,7 @@ class NewGenerator(StructuresGenerator):
 
             is_fused = False
 
-            if not mat_1.isComputed():
+            if not icode.bindingTable.isBound(mat_1.out) and icode.bindingTable.getPhysicalLayout(mat_1.out) is None:
                 #the multiply operator is now on the left
                 #so we recursively get the first two operators from the left
                 is_fused = True
@@ -2178,7 +2178,7 @@ class NewGenerator(StructuresGenerator):
                 src1 , nuSrc1 = mat_1.getInexprMatNuMat(1)
                 src2 , nuSrc2 = expr.getInexprMatNuMat(1)
 
-            elif not mat_2.isComputed():
+            elif not icode.bindingTable.isBound(mat_2.out) and icode.bindingTable.getPhysicalLayout(mat_2.out) is None:
                 is_fused = True
                 src0 , nuSrc0 = mat_2.getInexprMatNuMat(0)
                 src1 , nuSrc1 = mat_2.getInexprMatNuMat(1)

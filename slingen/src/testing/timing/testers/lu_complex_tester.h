@@ -22,7 +22,7 @@
 #include "helpers.h"
 #include "CommonDefs.h"
 
-#include "kernels/gemm_complex_kernel.h"
+#include "kernels/lu_complex_kernel.h"
 
 
 /*
@@ -179,7 +179,7 @@ int test()
       }
       end = stop_tsc(start);
       end -= overhead;
- 
+
       cycles = ((double) end) / num_runs;
 
       cycleList.push_back(cycles);
@@ -190,7 +190,7 @@ int test()
   dumpList(cycleList, string(EXEC_PATH) + "/cycles.txt");
   dumpList(flopList, string(EXEC_PATH) + "/flops.txt");
 #endif
-  
+
   destroy(A, B,initC, C);
 
   return retCode;
