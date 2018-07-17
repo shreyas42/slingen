@@ -1022,7 +1022,7 @@ class ToPolySigma(object):
                     union_projected_out_bss = bs_wo_acc
                 else:
                     intersection = union_projected_out_bss.intersect(bs_wo_acc)
-                    union_projected_out_bss.union(bs_wo_acc)
+                    union_projected_out_bss = union_projected_out_bss.union(bs_wo_acc)
                     if not intersection.is_empty():
                         dom_wo_acc = dom_wo_acc.union(intersection)
             

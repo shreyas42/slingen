@@ -3526,7 +3526,7 @@ class Quantity(Block):
             idcs, dom_info = self.info.get('indices', []), self.info.get('polytope', Set("{[]}"))
             return opts.get('idx_for_sca_dims', False) or get_expr_bound_over_domain(idcs, dom_info, part_size[pos], 'max') > 1
         
-        part_size = self.getPartitionSize(0, 0)
+        part_size = self.size #self.getPartitionSize(0, 0)
         self.spaceIdxNames[0] = [i*depth+ipfix if _place_idx(part_size, 0) else None]
         self.spaceIdxNames[1] = [j*depth+jpfix if _place_idx(part_size, 1) else None]
 #         self.spaceIdxNames[0] = [i*depth+ipfix]

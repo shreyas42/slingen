@@ -1646,6 +1646,8 @@ class StructuresGenerator(Generator):
             getattr(self, sub.__class__.__name__)(sub, opts, genopts, bounds, context)
 
         sub, nusub = expr.getInexprMatNuMat(0)
+        if expr.nuout is not None:
+            nusub = expr.nuout # In case of fusion Sacc could set the nuout for this gather obj
         dst = expr.out
 
         block = IBlock()
@@ -2170,7 +2172,7 @@ class NewGenerator(StructuresGenerator):
 
             is_fused = False
 
-            if not icode.bindingTable.isBound(mat_1.out) and icode.bindingTable.getPhysicalLayout(mat_1.out) is None:
+            if not icode.bindingTable.isBound(mat_1.out) and mat_1.__class__.__name__ in ['Mul']:
                 #the multiply operator is now on the left
                 #so we recursively get the first two operators from the left
                 is_fused = True
@@ -2178,7 +2180,7 @@ class NewGenerator(StructuresGenerator):
                 src1 , nuSrc1 = mat_1.getInexprMatNuMat(1)
                 src2 , nuSrc2 = expr.getInexprMatNuMat(1)
 
-            elif not icode.bindingTable.isBound(mat_2.out) and icode.bindingTable.getPhysicalLayout(mat_2.out) is None:
+            elif not icode.bindingTable.isBound(mat_2.out) and mat_2.__class__.__name__ in ['Mul']:
                 is_fused = True
                 src0 , nuSrc0 = mat_2.getInexprMatNuMat(0)
                 src1 , nuSrc1 = mat_2.getInexprMatNuMat(1)
@@ -2315,7 +2317,7 @@ class NewGenerator(StructuresGenerator):
         #added code
         chld_expr = expr.inexpr[0]
         is_fused = False
-        if not chld_expr.isComputed():
+        if not icode.bindingTable.isBound(chld_expr.out) and chld_expr.__class__.__name__ in ['Mul']:
             is_fused = True
         #end of added code
 
@@ -2329,14 +2331,15 @@ class NewGenerator(StructuresGenerator):
         gdst.setGenAccess(expr.out.genAccess())
 
         if is_fused:
-            sub1 = chld_expr.getInexprMat(0)
-            sub2 = chld_expr.getInexprMat(1)
-            subParams1 = self.allocator.extractParams(sub1 , bounds , opts , bcast=genopts['bcast'][sub1.name])
-            subParams2 = self.allocator.extractParams(sub2 , bounds , opts , bcast=genopts['bcast'][sub2.name])
-
+            sub1 , nuSub1 = chld_expr.getInexprMatNuMat(0)
+            sub2 , nuSub2 = chld_expr.getInexprMatNuMat(1)
+            subParams1 = self.allocator.extractParams(sub1 , bounds , opts , bcast=genopts['bcast'][sub1.name] , subNuM = nuSub1)
+            subParams2 = self.allocator.extractParams(sub2 , bounds , opts , bcast=genopts['bcast'][sub2.name], subNuM = nuSub2)
+            chld_expr.inexpr[0].nuout = subParams1['nuM']
+            chld_expr.inexpr[1].nuout = subParams2['nuM']
         else:
             subParams = self.allocator.extractParams(sub, bounds, opts, bcast=genopts['bcast'][sub.name])
-            expr.inexpr[0].nuout = subParams['nuM'] #what does this do?
+            expr.inexpr[0].nuout = subParams['nuM'] # Set a nuout for the child so that they (child and Sacc) can sync on the nuout
 
 
         if genopts.get('init', False):

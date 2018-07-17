@@ -1,0 +1,5 @@
+Matrix S(@m,@m)<Input , Symmetric , UpperStorage>;
+Matrix A(@m,@m)<Input>;
+Matrix C(@m,@m)<Output>;
+
+C = S*A;

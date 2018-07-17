@@ -2261,9 +2261,45 @@ class _Dbl4BLAC(object):
         instructions += [ Comment(str(nu) + "-BLAC: " + str(M) + "x" + str(K) + "*" + str(K) + "x" + str(N) + "+" + str(M) + "x" + str(N))]
         if M == 1:
             if N == 1:
-                pass
+                #this is the case of inner product
+                va = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0)]), range(nu))
+                vb = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0)]), range(nu))
+                vc = mm256LoadGd(Pointer(src2[s2L.of(0),s2R.of(0)]) , range(nu))
+                pc = Pointer(dst[dL.of(0),dR.of(0)])
+
+
+                vmul = mm256MulPd(va, vb)
+                vper = mm256Permute2f128Pd(vmul, vmul, [1,0,0,0,0,0,0,1])
+                vadd0 = mm256AddPd(vmul, vper)
+                vble = mm256BlendPd(vadd0, mm256SetzeroPd(), [1,1,1,0])
+                vshu = mm256ShufflePd(vadd0, vadd0, [0,0,0,1])
+                vadd1 = mm256AddPd(vble, vshu)
+                vres = mm256AddPd(vadd1 , vc)
+                instr = mm256StoreGd(vres, pc, range(nu))
+                instructions += [ instr ]
+
             else:
-                pass
+                #vector-matrix multiplication
+                vb0 = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0)]), range(nu))
+                vb1 = mm256LoadGd(Pointer(src1[s1L.of(1),s1R.of(0)]), range(nu))
+                vb2 = mm256LoadGd(Pointer(src1[s1L.of(2),s1R.of(0)]), range(nu))
+                vb3 = mm256LoadGd(Pointer(src1[s1L.of(3),s1R.of(0)]), range(nu))
+
+                va00 = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0)]), [tuple(range(nu))])
+                va01 = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(1)]), [tuple(range(nu))])
+                va02 = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(2)]), [tuple(range(nu))])
+                va03 = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(3)]), [tuple(range(nu))])
+                vc0 = mm256LoadGd(Pointer(src2[s2L.of(0) , s2R.of(0)]) , range(nu))
+                pc = Pointer(dst[dL.of(0),dR.of(0)])
+
+                vc0 = mm256FmaddPd(va00,vb0,vc0)
+                vc0 = mm256FmaddPd(va01,vb1,vc0)
+                vc0 = mm256FmaddPd(va02,vb2,vc0)
+                vc0 = mm256FmaddPd(va03,vb3,vc0)
+
+                instr = mm256StoreGd(vc0, pc , range(nu))
+                instructions += [ instr ]
+
         else:
             if K == 1:
                 #this is the outer product
@@ -2293,7 +2329,27 @@ class _Dbl4BLAC(object):
 
             else:
                 if N == 1:
-                    pass
+                    #this is the case of a matrix-vector product
+                    va0 = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0)]), range(nu))
+                    va1 = mm256LoadGd(Pointer(src0[s0L.of(1),s0R.of(0)]), range(nu))
+                    va2 = mm256LoadGd(Pointer(src0[s0L.of(2),s0R.of(0)]), range(nu))
+                    va3 = mm256LoadGd(Pointer(src0[s0L.of(3),s0R.of(0)]), range(nu))
+                    vb = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0)]), range(nu))
+                    mul0 = mm256MulPd(va0, vb)
+                    mul1 = mm256MulPd(va1, vb)
+                    mul2 = mm256MulPd(va2, vb)
+                    mul3 = mm256MulPd(va3, vb)
+                    hadd0 = mm256HaddPd(mul0, mul1)
+                    hadd1 = mm256HaddPd(mul2, mul3)
+                    vper = mm256Permute2f128Pd(hadd0, hadd1, [0,0,1,0,0,0,0,1])
+                    vble = mm256BlendPd(hadd0, hadd1, [1,1,0,0])
+                    vc = mm256LoadGd(Pointer(src2[s2L.of(0) , s2R.of(0)]) , range(nu))
+                    vtemp = mm256AddPd(vper, vble)
+                    vres = mm256AddPd(vtemp , vc)
+                    pc = Pointer(dst[dL.of(0),dR.of(0)])
+                    instr = mm256StoreGd(vres , pc, range(nu))
+                    instructions += [ instr ]
+
                 else:
                     #this is the general matrix-matrix multiplication
                     vb0 = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0)]), range(nu))

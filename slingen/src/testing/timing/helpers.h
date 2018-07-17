@@ -81,6 +81,10 @@ void zeros(FLOAT * m, size_t row, size_t col)
 	for (size_t i = 0; i < row*col; ++i)  m[i] = 0.;
 }
 
+void ones(FLOAT *m , size_t row , size_t col){
+	for(size_t i = 0; i <row*col;i++) m[i] = 1.;
+}
+
 void lrands(FLOAT * m, size_t row , size_t col)
 {
     for(size_t i=0;i<row;++i){
@@ -95,6 +99,22 @@ void lrands(FLOAT * m, size_t row , size_t col)
     }
 
 }
+
+void lones(FLOAT * m, size_t row , size_t col)
+{
+    for(size_t i=0;i<row;++i){
+        for(size_t j=0;j<=i;++j){
+            m[i*col + j] = 1.;
+        }
+    }
+    for(size_t i=0;i<row;++i){
+        for(size_t j=i+1;j<col;++j){
+            m[i*col + j] = 0.;
+        }
+    }
+
+}
+
 void urands(FLOAT * m , size_t row , size_t col)
 {
     for(size_t i=0;i<row;++i){
@@ -109,6 +129,16 @@ void urands(FLOAT * m , size_t row , size_t col)
     }
 
 }
+
+void syms(FLOAT *m , size_t row , size_t col){
+    for(size_t i=0;i<row;++i){
+        for(size_t j=i;j<col;++j){
+            m[j*col + i] = m[i*col + j] = (FLOAT)(rand())/RAND_MAX + 1;
+        }
+    }
+
+}
+
 template <typename Msg_Type>
 void dumpList(std::list< Msg_Type > const & l, string const & filename)
 {
