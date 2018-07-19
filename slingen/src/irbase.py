@@ -463,7 +463,7 @@ class Access(object):
 
         l_mrmap = len(self.mrmap)
         if is_complex_layout:
-            corner = (self.pointer.at[0], self.pointer.at[1]+l_mrmap , 1) if self.horizontal else (self.pointer.at[0]+l_mrmap, self.pointer.at[1])
+            corner = (self.pointer.at[0], self.pointer.at[1]+l_mrmap , self.pointer.at[2]) if self.horizontal else (self.pointer.at[0]+l_mrmap, self.pointer.at[1] , self.pointer.at[2])
         else:
             corner = (self.pointer.at[0], self.pointer.at[1]+l_mrmap) if self.horizontal else (self.pointer.at[0]+l_mrmap, self.pointer.at[1])
 
@@ -474,7 +474,11 @@ class Access(object):
             return { 'pList': [ self.pointer ], 'mrmap': [ self.mrmap ], 'notum': [ self.not_using_mask ] }
         else:
             pointer = self.pointer
-            plist = [pointer] + [Pointer((pointer.mat, (pointer.at[0] + i, pointer.at[1]))) for i in range(1, len(self.mrmap))]
+            if is_complex_layout:
+                plist = [pointer] + [Pointer((pointer.mat, (pointer.at[0] + i, pointer.at[1] , pointer.at[2]))) for i in range(1, len(self.mrmap))]
+            else:
+                plist = [pointer] + [Pointer((pointer.mat, (pointer.at[0] + i, pointer.at[1]))) for i in range(1, len(self.mrmap))]
+
             mrmaps = [ [p] for p in self.mrmap ]
             notum = [ [m] for m in self.not_using_mask ]
             return { 'pList': plist, 'mrmap': mrmaps, 'notum': notum }

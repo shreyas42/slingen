@@ -2409,6 +2409,29 @@ class NewGenerator(StructuresGenerator):
         #             icode.blocks += [ block ]
         expr.setComputed(genopts['setComp'])
 
+        #overriding the load and store methods
+
+    def Load(self , mParamsList, opts):
+        instructions = []
+        for mParams in mParamsList:
+            if 'field' in opts.keys():
+                loader = opts['isaman'].getLoader(opts['precision'] , mParams['nu'] , opts['field'])
+            else:
+                loader = opts['isaman'].getLoader(opts['precision'] , mParams['nu'])
+            instructions += loader.loadMatrix(mParams)
+        return instructions
+
+    def Store(self, mParamsList, opts):
+        instructions = []
+        for mParams in mParamsList:
+            #             if mParams['nu'] > 1:
+            if 'field' in opts.keys():
+                storer = opts['isaman'].getStorer(opts['precision'], mParams['nu'] , opts['field'])
+            else:
+                storer = opts['isaman'].getStorer(opts['precision'], mParams['nu'])
+
+            instructions += storer.storeMatrix(mParams)
+        return instructions
 
 if __name__ == '__main__':
     pass

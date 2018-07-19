@@ -340,6 +340,12 @@ class mm256LoadGd(RValue, VecAccess):
         horizontal = self.horizontal
         isCompact = self.isCompact
         content = None
+
+        complexLayout = False
+        if len(pointer.at) == 3:
+            complexLayout = True
+        #new code
+
         if len(mrmap) == 1:
             if mrmap == [tuple(range(self.reglen))]:
                 content = mm256BroadcastSd(pointer, zeromask)
@@ -348,7 +354,10 @@ class mm256LoadGd(RValue, VecAccess):
             else:
                 vmask = self.reglen*[0]
                 vmask[mrmap[0]] = 1
-                maskPtr = pointer if isinstance(pointer.ref, ScalarsReference) else Pointer((pointer.mat, (pointer.at[0], pointer.at[1] - mrmap[0])))
+                if complexLayout:
+                    maskPtr = pointer if isinstance(pointer.ref, ScalarsReference) else Pointer((pointer.mat, (pointer.at[0], pointer.at[1] - mrmap[0] , pointer.at[2])))
+                else:
+                    maskPtr = pointer if isinstance(pointer.ref, ScalarsReference) else Pointer((pointer.mat, (pointer.at[0], pointer.at[1] - mrmap[0])))
                 content = mm256MaskloadPd(maskPtr, vmask, zeromask)
         elif mrmap == range(len(mrmap)):
             l = len(mrmap)
@@ -363,7 +372,10 @@ class mm256LoadGd(RValue, VecAccess):
             else: # Incompact case should appear only if vertical
 #                 vmask = [1] + 3*[0]
 #                 es = [ mm256MaskloadPd(Pointer((pointer.mat, (pointer.at[0] + i, pointer.at[1]))), vmask) for i in range(l) ]
-                es = [ mm256CastPd128Pd256(mmLoadSd(Pointer((pointer.mat, (pointer.at[0] + i, pointer.at[1]))))) for i in range(l) ]
+                if complexLayout:
+                    es = [ mm256CastPd128Pd256(mmLoadSd(Pointer((pointer.mat, (pointer.at[0] + i, pointer.at[1] , pointer.at[2]))))) for i in range(l) ]
+                else:
+                    es = [ mm256CastPd128Pd256(mmLoadSd(Pointer((pointer.mat, (pointer.at[0] + i, pointer.at[1]))))) for i in range(l) ]
                 if l == 2:
                     content = mm256ShufflePd(es[0], es[1], [0,0,0,0])
                 elif l==3:
@@ -374,7 +386,10 @@ class mm256LoadGd(RValue, VecAccess):
             vmask = self.reglen*[0]
             for i in mrmap:
                 vmask[i] = 1
-            content = mm256MaskloadPd(Pointer((pointer.mat, (pointer.at[0], pointer.at[1] - mrmap[0]))), vmask, zeromask)
+            if complexLayout:
+                content = mm256MaskloadPd(Pointer((pointer.mat, (pointer.at[0], pointer.at[1] - mrmap[0] , pointer.at[2]))), vmask, zeromask)
+            else:
+                content = mm256MaskloadPd(Pointer((pointer.mat, (pointer.at[0], pointer.at[1] - mrmap[0]))), vmask, zeromask)
 
         if content is None:
             raise ValueError('mm256LoadGd does not support mrmap %s with %s layout yet' % (str(mrmap), 'horizontal' if horizontal else 'vertical'))
@@ -432,6 +447,7 @@ class mm256StoreGd(MovStatement):
         self.analysis = None
         self._content = None
 
+
     @property
     def content(self):
         if self._content is None:
@@ -445,6 +461,9 @@ class mm256StoreGd(MovStatement):
         horizontal = self.horizontal
         isCompact = self.isCompact
         content = None
+        complexLayout = False
+        if len(dst.at) == 3:
+            complexLayout = True
 
         if len(mrmap) == 1:
             if mrmap[0] == 0:
@@ -452,7 +471,10 @@ class mm256StoreGd(MovStatement):
             else:
                 vmask = self.reglen*[0]
                 vmask[mrmap[0]] = 1
-                content = [mm256MaskstorePd(vmask, src, Pointer((dst.mat, (dst.at[0], dst.at[1]-mrmap[0]))))]
+                if complexLayout:
+                    content = [mm256MaskstorePd(vmask, src, Pointer((dst.mat, (dst.at[0], dst.at[1]-mrmap[0] , dst.at[2]))))]
+                else:
+                    content = [mm256MaskstorePd(vmask, src, Pointer((dst.mat, (dst.at[0], dst.at[1]-mrmap[0]))))]
         elif mrmap == range(len(mrmap)):
             l = len(mrmap)
             if isCompact or horizontal:
@@ -466,7 +488,10 @@ class mm256StoreGd(MovStatement):
             else: # Incompact case should appear only if vertical
                 content = []
                 vmask = [1] + 3*[0]
-                pcs = [ Pointer((dst.mat, (dst.at[0] + i, dst.at[1]))) for i in range(l) ]
+                if complexLayout:
+                    pcs = [ Pointer((dst.mat, (dst.at[0] + i, dst.at[1] , dst.at[2]))) for i in range(l) ]
+                else:
+                    pcs = [ Pointer((dst.mat, (dst.at[0] + i, dst.at[1]))) for i in range(l) ]
                 if l == 2:
                     content.append( mm256MaskstorePd(vmask, src, pcs[0]) )
                     content.append( mm256MaskstorePd(vmask, mm256ShufflePd(src, src, [0,0,0,1]), pcs[1]) )
@@ -484,8 +509,13 @@ class mm256StoreGd(MovStatement):
             vmask = self.reglen*[0]
             for i in mrmap:
                 vmask[i] = 1
-            content = [mm256MaskstorePd(vmask, src, Pointer((dst.mat, (dst.at[0], dst.at[1]-mrmap[0]))))]
-#         elif mrmap == [1, 2]:
+            if complexLayout:
+                content = [mm256MaskstorePd(vmask, src, Pointer((dst.mat, (dst.at[0], dst.at[1]-mrmap[0] , dst.at[2]))))]
+            else:
+                content = [mm256MaskstorePd(vmask, src, Pointer((dst.mat, (dst.at[0], dst.at[1]-mrmap[0]))))]
+
+#
+        # elif mrmap == [1, 2]:
 #             if horizontal or isCompact:
 #                 v1_2 = mmShufflePs(src, src, (3,3,2,1))
 #                 content = [mmStorelPi(v1_2, PointerCast("__m64", dst))]
@@ -2168,11 +2198,14 @@ class _Dbl4BLAC(object):
                 va1 = mm256LoadGd(Pointer(src0[s0L.of(1),s0R.of(0)]), [tuple(range(nu))])
                 va2 = mm256LoadGd(Pointer(src0[s0L.of(2),s0R.of(0)]), [tuple(range(nu))])
                 va3 = mm256LoadGd(Pointer(src0[s0L.of(3),s0R.of(0)]), [tuple(range(nu))])
+
                 vb = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0)]), range(nu))
+
                 pc0 = Pointer(dst[dL.of(0),dR.of(0)])
                 pc1 = Pointer(dst[dL.of(1),dR.of(0)])
                 pc2 = Pointer(dst[dL.of(2),dR.of(0)])
                 pc3 = Pointer(dst[dL.of(3),dR.of(0)])
+
                 instr0 = mm256StoreGd(mm256MulPd(va0, vb), pc0, range(nu))
                 instr1 = mm256StoreGd(mm256MulPd(va1, vb), pc1, range(nu))
                 instr2 = mm256StoreGd(mm256MulPd(va2, vb), pc2, range(nu))
@@ -2780,7 +2813,7 @@ class _CmpDbl4BLAC(object):
             pc_img = Pointer(dst[dL.of(0),dR.of(0) , 1])
 
             instr1 = mm256StoreGd(mm256AddPd(va_real, vb_real), pc_real, range(nu))
-            instr2 = mm256StoreGd(mm256AddPd(va_img , vb_img , pc_img) , range(nu))
+            instr2 = mm256StoreGd(mm256AddPd(va_img , vb_img ), pc_img , range(nu))
             instructions += [ instr1 , instr2 ]
         elif M == nu and N == nu:
             for i in range(M):
@@ -2892,15 +2925,272 @@ class _CmpDbl4BLAC(object):
 
         if M == 1:
             if N == 1:
-                pass
+                #this is the case of the inner product
+                va_real = mm256LoadGd(Pointer(src0[s0L.of(0) , s0R.of(0) , 0]), range(nu))
+                vb_real = mm256LoadGd(Pointer(src1[s1L.of(0) , s1R.of(0) , 0]), range(nu))
+
+                va_img = mm256LoadGd(Pointer(src0[s0L.of(0) , s0R.of(0) , 1]), range(nu))
+                vb_img = mm256LoadGd(Pointer(src1[s1L.of(0) , s1R.of(0) , 1]), range(nu))
+
+                pc_real = Pointer(dst[dL.of(0) , dR.of(0) , 0])
+                pc_img = Pointer(dst[dL.of(0) , dR.of(0) , 1])
+
+                #first part of calculating the real portion of the answer
+                #multiplying real and real
+                v0mul = mm256MulPd(va_real , vb_real)
+                v0per = mm256Permute2f128Pd(v0mul , v0mul , [1,0,0,0,0,0,0,1])
+                v0add = mm256AddPd(v0mul , v0per)
+                v0ble = mm256BlendPd(v0add , mm256SetzeroPd() , [1,1,1,0])
+                v0shu = mm256ShufflePd(v0add , v0add , [0,0,0,1])
+                temp0 = mm256AddPd(v0ble , v0shu)
+
+                #second part of calculating the imaginary portion of the answer
+                #multiplying imaginary and imaginary
+                v1mul = mm256MulPd(va_img , vb_img)
+                v1per = mm256Permute2f128Pd(v1mul , v1mul , [1,0,0,0,0,0,0,1])
+                v1add = mm256AddPd(v1mul , v1per)
+                v1ble = mm256BlendPd(v1add , mm256SetzeroPd() , [1,1,1,0])
+                v1shu = mm256ShufflePd(v1add , v1add , [0,0,0,1])
+                temp1 = mm256AddPd(v1ble , v1shu)
+
+                #ac - bd
+                real_res = mm256SubPd(temp0 , temp1)
+                instr1 = mm256StoreGd(real_res , pc_real , range(nu))
+
+                #calculating the imaginary part of the complex number
+                #first part is multiplying real with imaginary
+                v2mul = mm256MulPd(va_real , vb_img)
+                v2per = mm256Permute2f128Pd(v2mul , v2mul , [1,0,0,0,0,0,0,1])
+                v2add = mm256AddPd(v2mul , v2per)
+                v2ble = mm256BlendPd(v2add , mm256SetzeroPd() , [1,1,1,0])
+                v2shu = mm256ShufflePd(v2add , v2add , [0,0,0,1])
+                temp2 = mm256AddPd(v2ble , v2shu)
+
+                #second part of calculating the imaginary part of the complex number
+                #this is imaginary with real
+                v3mul = mm256MulPd(va_img , vb_real)
+                v3per = mm256Permute2f128Pd(v3mul , v3mul , [1,0,0,0,0,0,0,1])
+                v3add = mm256AddPd(v3mul , v3per)
+                v3ble = mm256BlendPd(v3add , mm256SetzeroPd() , [1,1,1,0])
+                v3shu = mm256ShufflePd(v3add , v3add , [0,0,0,1])
+                temp3 = mm256AddPd(v3ble , v3shu)
+
+                #ad+bc
+                img_res = mm256AddPd(temp2 , temp3)
+                instr2 = mm256StoreGd(img_res , pc_img , range(nu))
+
+                instructions += [ instr1 , instr2 ]
+
             else:
-                pass
+                #this is the cast of the vector - matrix multiplication
+                vb0real = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0) , 0]), range(nu))
+                vb1real = mm256LoadGd(Pointer(src1[s1L.of(1),s1R.of(0) , 0]), range(nu))
+                vb2real = mm256LoadGd(Pointer(src1[s1L.of(2),s1R.of(0) , 0]), range(nu))
+                vb3real = mm256LoadGd(Pointer(src1[s1L.of(3),s1R.of(0) , 0]), range(nu))
+
+                va00real = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0) , 0]), [tuple(range(nu))])
+                va01real = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(1) , 0]), [tuple(range(nu))])
+                va02real = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(2) , 0]), [tuple(range(nu))])
+                va03real = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(3) , 0]), [tuple(range(nu))])
+
+                vb0img = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0) , 1]), range(nu))
+                vb1img = mm256LoadGd(Pointer(src1[s1L.of(1),s1R.of(0) , 1]), range(nu))
+                vb2img = mm256LoadGd(Pointer(src1[s1L.of(2),s1R.of(0) , 1]), range(nu))
+                vb3img = mm256LoadGd(Pointer(src1[s1L.of(3),s1R.of(0) , 1]), range(nu))
+
+                va00img = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0) , 1]), [tuple(range(nu))])
+                va01img = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(1) , 1]), [tuple(range(nu))])
+                va02img = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(2) , 1]), [tuple(range(nu))])
+                va03img = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(3) , 1]), [tuple(range(nu))])
+
+                pc_real = Pointer(dst[dL.of(0) , dR.of(0) , 0])
+                pc_img = Pointer(dst[dL.of(0) , dR.of(0) , 1])
+
+                #calculating the real part of the complex number result
+                mul0real = mm256MulPd(va00real , vb0real)
+                mul1real = mm256MulPd(va00img , vb0img)
+                real_res = mm256SubPd(mul0real , mul1real)
+
+                mul1real = mm256MulPd(va01real , vb1real)
+                mul2real = mm256MulPd(va01img , vb1img)
+                temp1 = mm256SubPd(mul1real , mul2real)
+                real_res = mm256AddPd(real_res , temp1)
+
+                mul3real = mm256MulPd(va02real , vb2real)
+                mul4real = mm256MulPd(va02img , vb2img)
+                temp2 = mm256SubPd(mul3real , mul4real)
+                real_res = mm256AddPd(real_res , temp2)
+
+                mul5real = mm256MulPd(va03real , vb3real)
+                mul6real = mm256MulPd(va03img , vb3img)
+                temp3 = mm256SubPd(mul5real , mul6real)
+                real_res = mm256AddPd(real_res , temp3)
+
+                instr1 = mm256StoreGd(real_res , pc_real , range(nu))
+
+                #calculating the imaginary part
+                mul0img = mm256MulPd(va00real , vb0img)
+                mul1img = mm256MulPd(va00img , vb0real)
+                img_res = mm256SubPd(mul0img , mul1img)
+
+                mul1img = mm256MulPd(va01real , vb1img)
+                mul2img = mm256MulPd(va01img , vb1real)
+                temp4 = mm256SubPd(mul1img , mul2img)
+                img_res = mm256AddPd(img_res , temp4)
+
+                mul3img = mm256MulPd(va02real , vb2img)
+                mul4img = mm256MulPd(va02img , vb2real)
+                temp5 = mm256SubPd(mul3img , mul4img)
+                img_res = mm256AddPd(img_res , temp5)
+
+                mul5img = mm256MulPd(va03real , vb3img)
+                mul6img = mm256MulPd(va03img , vb3real)
+                temp6 = mm256SubPd(mul5img , mul6img)
+                img_res = mm256AddPd(img_res , temp6)
+
+                instr2 = mm256StoreGd(img_res , pc_img , range(nu))
+
+                instructions += [instr1 , instr2]
+
         else:
             if K == 1:
-                pass
+                #this is the case of an outer product
+
+                va0real = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0) , 0]), [tuple(range(nu))])
+                va1real = mm256LoadGd(Pointer(src0[s0L.of(1),s0R.of(0) , 0]), [tuple(range(nu))])
+                va2real = mm256LoadGd(Pointer(src0[s0L.of(2),s0R.of(0) , 0]), [tuple(range(nu))])
+                va3real = mm256LoadGd(Pointer(src0[s0L.of(3),s0R.of(0) , 0]), [tuple(range(nu))])
+
+                vbreal = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0) , 0]), range(nu))
+
+                pc0real = Pointer(dst[dL.of(0),dR.of(0) , 0])
+                pc1real = Pointer(dst[dL.of(1),dR.of(0) , 0])
+                pc2real = Pointer(dst[dL.of(2),dR.of(0) , 0])
+                pc3real = Pointer(dst[dL.of(3),dR.of(0) , 0])
+
+                va0img = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0) , 1]), [tuple(range(nu))])
+                va1img = mm256LoadGd(Pointer(src0[s0L.of(1),s0R.of(0) , 1]), [tuple(range(nu))])
+                va2img = mm256LoadGd(Pointer(src0[s0L.of(2),s0R.of(0) , 1]), [tuple(range(nu))])
+                va3img = mm256LoadGd(Pointer(src0[s0L.of(3),s0R.of(0) , 1]), [tuple(range(nu))])
+
+                vbimg = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0) , 1]), range(nu))
+
+                pc0img = Pointer(dst[dL.of(0),dR.of(0) , 1])
+                pc1img = Pointer(dst[dL.of(1),dR.of(0) , 1])
+                pc2img = Pointer(dst[dL.of(2),dR.of(0) , 1])
+                pc3img = Pointer(dst[dL.of(3),dR.of(0) , 1])
+
+                mul0real = mm256MulPd(va0real , vbreal)
+                mul1real = mm256MulPd(va0img , vbimg)
+                instr0real = mm256StoreGd(mm256SubPd(mul0real , mul1real) , pc0real , range(nu))
+
+                mul0img = mm256MulPd(va0real , vbimg)
+                mul1img = mm256MulPd(va0img , vbreal)
+                instr0img = mm256StoreGd(mm256AddPd(mul0img , mul1img) , pc0img , range(nu))
+
+                mul2real = mm256MulPd(va1real , vbreal)
+                mul3real = mm256MulPd(va1img , vbimg)
+                instr1real = mm256StoreGd(mm256SubPd(mul2real , mul3real) , pc1real , range(nu))
+
+                mul2img = mm256MulPd(va1real , vbimg)
+                mul3img = mm256MulPd(va1img , vbreal)
+                instr1img = mm256StoreGd(mm256AddPd(mul2img , mul3img) , pc1img , range(nu))
+
+                mul4real = mm256MulPd(va2real , vbreal)
+                mul5real = mm256MulPd(va2img , vbimg)
+                instr2real = mm256StoreGd(mm256SubPd(mul4real , mul5real) , pc2real , range(nu))
+
+                mul4img = mm256MulPd(va2real , vbimg)
+                mul5img = mm256MulPd(va2img , vbreal)
+                instr2img = mm256StoreGd(mm256AddPd(mul4img , mul5img) , pc2img , range(nu))
+
+                mul6real = mm256MulPd(va3real , vbreal)
+                mul7real = mm256MulPd(va3img , vbimg)
+                instr3real = mm256StoreGd(mm256SubPd(mul6real , mul7real) , pc3real , range(nu))
+
+                mul6img = mm256MulPd(va3real , vbimg)
+                mul7img = mm256MulPd(va3img , vbreal)
+                instr3img = mm256StoreGd(mm256AddPd(mul6img , mul7img) , pc3img , range(nu))
+
+                instructions += [instr0real , instr0img , instr1real , instr1img ,  instr2real , instr2img , instr3real , instr3img  ]
+
             else:
                 if N == 1:
-                    pass
+                    #this is the case of a matrix-vector product
+                    va0real = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0) , 0]), range(nu))
+                    va1real = mm256LoadGd(Pointer(src0[s0L.of(1),s0R.of(0) , 0]), range(nu))
+                    va2real = mm256LoadGd(Pointer(src0[s0L.of(2),s0R.of(0) , 0]), range(nu))
+                    va3real = mm256LoadGd(Pointer(src0[s0L.of(3),s0R.of(0) , 0]), range(nu))
+
+                    vbreal = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0) , 0]), range(nu))
+
+                    va0img = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0) , 1]), range(nu))
+                    va1img = mm256LoadGd(Pointer(src0[s0L.of(1),s0R.of(0) , 1]), range(nu))
+                    va2img = mm256LoadGd(Pointer(src0[s0L.of(2),s0R.of(0) , 1]), range(nu))
+                    va3img = mm256LoadGd(Pointer(src0[s0L.of(3),s0R.of(0) , 1]), range(nu))
+
+                    vbimg = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0) , 1]), range(nu))
+
+                    pc_real = Pointer(dst[dL.of(0) , dR.of(0) , 0])
+                    pc_img = Pointer(dst[dL.of(0) , dR.of(0) , 1])
+
+                    mul00real = mm256MulPd(va0real , vbreal)
+                    mul01real = mm256MulPd(va0img , vbimg)
+
+                    t0real = mm256SubPd(mul00real , mul01real)
+
+                    mul10real = mm256MulPd(va1real , vbreal)
+                    mul11real = mm256MulPd(va1img , vbimg)
+
+                    t1real = mm256SubPd(mul10real , mul11real)
+
+                    mul20real = mm256MulPd(va2real , vbreal)
+                    mul21real = mm256MulPd(va2img , vbimg)
+
+                    t2real = mm256SubPd(mul20real , mul21real)
+
+                    mul30real = mm256MulPd(va3real , vbreal)
+                    mul31real = mm256MulPd(va3img , vbimg)
+
+                    t3real = mm256SubPd(mul30real , mul31real)
+
+                    hadd0real = mm256HaddPd(t0real , t1real)
+                    hadd1real = mm256HaddPd(t2real , t3real)
+
+                    vper_real = mm256Permute2f128Pd(hadd0real , hadd1real , [0,0,1,0,0,0,0,1])
+                    vble_real = mm256BlendPd(hadd0real , hadd1real , [1,1,0,0])
+
+                    instr0 = mm256StoreGd(mm256AddPd(vper_real , vble_real) , pc_real , range(nu))
+
+                    mul00img = mm256MulPd(va0real , vbimg)
+                    mul01img = mm256MulPd(va0img , vbreal)
+
+                    t0img = mm256AddPd(mul00img , mul01img)
+
+                    mul10img = mm256MulPd(va1real , vbimg)
+                    mul11img = mm256MulPd(va1img , vbreal)
+
+                    t1img = mm256AddPd(mul10img , mul11img)
+
+                    mul20img = mm256MulPd(va2real , vbimg)
+                    mul21img = mm256MulPd(va2img , vbreal)
+
+                    t2img = mm256AddPd(mul20img , mul21img)
+
+                    mul30img = mm256MulPd(va3real , vbimg)
+                    mul31img = mm256MulPd(va3img , vbreal)
+
+                    t3img = mm256AddPd(mul30img , mul31img)
+
+                    hadd0img = mm256HaddPd(t0img , t1img)
+                    hadd1img = mm256HaddPd(t2img , t3img)
+
+                    vper_img = mm256Permute2f128Pd(hadd0img , hadd1img , [0,0,1,0,0,0,0,1])
+                    vble_img = mm256BlendPd(hadd0img , hadd1img , [1,1,0,0])
+
+                    instr1 = mm256StoreGd(mm256AddPd(vper_img , vble_img) , pc_img , range(nu))
+
+                    instructions += [instr0 , instr1]
                 else:
                     #the matrix-matrix multiplication case
                     vb0_real = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0) , 0]), range(nu)) #loads the vector at src1[0,0]
@@ -2995,7 +3285,63 @@ class _CmpDbl4BLAC(object):
 
         if M == 1:
             if N == 1:
-                pass
+                va_real = mm256LoadGd(Pointer(src0[s0L.of(0) , s0R.of(0) , 0]), range(nu))
+                vb_real = mm256LoadGd(Pointer(src1[s1L.of(0) , s1R.of(0) , 0]), range(nu))
+
+                va_img = mm256LoadGd(Pointer(src0[s0L.of(0) , s0R.of(0) , 1]), range(nu))
+                vb_img = mm256LoadGd(Pointer(src1[s1L.of(0) , s1R.of(0) , 1]), range(nu))
+
+                pc_real = Pointer(dst[dL.of(0) , dR.of(0) , 0])
+                pc_img = Pointer(dst[dL.of(0) , dR.of(0) , 1])
+
+                #first part of calculating the real portion of the answer
+                #multiplying real and real
+                v0mul = mm256MulPd(va_real , vb_real)
+                v0per = mm256Permute2f128Pd(v0mul , v0mul , [1,0,0,0,0,0,0,1])
+                v0add = mm256AddPd(v0mul , v0per)
+                v0ble = mm256BlendPd(v0add , mm256SetzeroPd() , [1,1,1,0])
+                v0shu = mm256ShufflePd(v0add , v0add , [0,0,0,1])
+                temp0 = mm256AddPd(v0ble , v0shu)
+
+                #second part of calculating the imaginary portion of the answer
+                #multiplying imaginary and imaginary
+                v1mul = mm256MulPd(va_img , vb_img)
+                v1per = mm256Permute2f128Pd(v1mul , v1mul , [1,0,0,0,0,0,0,1])
+                v1add = mm256AddPd(v1mul , v1per)
+                v1ble = mm256BlendPd(v1add , mm256SetzeroPd() , [1,1,1,0])
+                v1shu = mm256ShufflePd(v1add , v1add , [0,0,0,1])
+                temp1 = mm256AddPd(v1ble , v1shu)
+
+                #ac - bd
+                real_res = mm256SubPd(temp0 , temp1)
+                vcreal = mm256LoadGd(Pointer(src2[s2L.of(0) , s2R.of(0) , 0]) , range(nu))
+                instr1 = mm256StoreGd(mm256AddPd(real_res , vcreal) , pc_real , range(nu))
+
+                #calculating the imaginary part of the complex number
+                #first part is multiplying real with imaginary
+                v2mul = mm256MulPd(va_real , vb_img)
+                v2per = mm256Permute2f128Pd(v2mul , v2mul , [1,0,0,0,0,0,0,1])
+                v2add = mm256AddPd(v2mul , v2per)
+                v2ble = mm256BlendPd(v2add , mm256SetzeroPd() , [1,1,1,0])
+                v2shu = mm256ShufflePd(v2add , v2add , [0,0,0,1])
+                temp2 = mm256AddPd(v2ble , v2shu)
+
+                #second part of calculating the imaginary part of the complex number
+                #this is imaginary with real
+                v3mul = mm256MulPd(va_img , vb_real)
+                v3per = mm256Permute2f128Pd(v3mul , v3mul , [1,0,0,0,0,0,0,1])
+                v3add = mm256AddPd(v3mul , v3per)
+                v3ble = mm256BlendPd(v3add , mm256SetzeroPd() , [1,1,1,0])
+                v3shu = mm256ShufflePd(v3add , v3add , [0,0,0,1])
+                temp3 = mm256AddPd(v3ble , v3shu)
+
+                #ad+bc
+                img_res = mm256AddPd(temp2 , temp3)
+                vcimg = mm256LoadGd(Pointer(src2[s2L.of(0) , s2R.of(0) , 1]) , range(nu))
+                instr2 = mm256StoreGd(mm256AddPd(img_res ,vcimg) , pc_img , range(nu))
+
+                instructions += [ instr1 , instr2 ]
+
             else:
                 #vector-matrix multiplication
 
@@ -3147,7 +3493,84 @@ class _CmpDbl4BLAC(object):
 
             else:
                 if N == 1:
-                    pass
+                    #this is the case of a matrix-vector product
+                    va0real = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0) , 0]), range(nu))
+                    va1real = mm256LoadGd(Pointer(src0[s0L.of(1),s0R.of(0) , 0]), range(nu))
+                    va2real = mm256LoadGd(Pointer(src0[s0L.of(2),s0R.of(0) , 0]), range(nu))
+                    va3real = mm256LoadGd(Pointer(src0[s0L.of(3),s0R.of(0) , 0]), range(nu))
+
+                    vbreal = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0) , 0]), range(nu))
+
+                    va0img = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0) , 1]), range(nu))
+                    va1img = mm256LoadGd(Pointer(src0[s0L.of(1),s0R.of(0) , 1]), range(nu))
+                    va2img = mm256LoadGd(Pointer(src0[s0L.of(2),s0R.of(0) , 1]), range(nu))
+                    va3img = mm256LoadGd(Pointer(src0[s0L.of(3),s0R.of(0) , 1]), range(nu))
+
+                    vbimg = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0) , 1]), range(nu))
+
+                    pc_real = Pointer(dst[dL.of(0) , dR.of(0) , 0])
+                    pc_img = Pointer(dst[dL.of(0) , dR.of(0) , 1])
+
+                    vcreal = mm256LoadGd(Pointer(src2[s2L.of(0) , s2R.of(0) , 0]) , range(nu))
+                    vcimg = mm256LoadGd(Pointer(src2[s2L.of(0) , s2R.of(0) , 1]) , range(nu))
+
+                    mul00real = mm256MulPd(va0real , vbreal)
+                    mul01real = mm256MulPd(va0img , vbimg)
+
+                    t0real = mm256SubPd(mul00real , mul01real)
+
+                    mul10real = mm256MulPd(va1real , vbreal)
+                    mul11real = mm256MulPd(va1img , vbimg)
+
+                    t1real = mm256SubPd(mul10real , mul11real)
+
+                    mul20real = mm256MulPd(va2real , vbreal)
+                    mul21real = mm256MulPd(va2img , vbimg)
+
+                    t2real = mm256SubPd(mul20real , mul21real)
+
+                    mul30real = mm256MulPd(va3real , vbreal)
+                    mul31real = mm256MulPd(va3img , vbimg)
+
+                    t3real = mm256SubPd(mul30real , mul31real)
+
+                    hadd0real = mm256HaddPd(t0real , t1real)
+                    hadd1real = mm256HaddPd(t2real , t3real)
+
+                    vper_real = mm256Permute2f128Pd(hadd0real , hadd1real , [0,0,1,0,0,0,0,1])
+                    vble_real = mm256BlendPd(hadd0real , hadd1real , [1,1,0,0])
+
+                    instr0 = mm256StoreGd(mm256AddPd(mm256AddPd(vper_real , vble_real) , vcreal) , pc_real , range(nu))
+
+                    mul00img = mm256MulPd(va0real , vbimg)
+                    mul01img = mm256MulPd(va0img , vbreal)
+
+                    t0img = mm256AddPd(mul00img , mul01img)
+
+                    mul10img = mm256MulPd(va1real , vbimg)
+                    mul11img = mm256MulPd(va1img , vbreal)
+
+                    t1img = mm256AddPd(mul10img , mul11img)
+
+                    mul20img = mm256MulPd(va2real , vbimg)
+                    mul21img = mm256MulPd(va2img , vbreal)
+
+                    t2img = mm256AddPd(mul20img , mul21img)
+
+                    mul30img = mm256MulPd(va3real , vbimg)
+                    mul31img = mm256MulPd(va3img , vbreal)
+
+                    t3img = mm256AddPd(mul30img , mul31img)
+
+                    hadd0img = mm256HaddPd(t0img , t1img)
+                    hadd1img = mm256HaddPd(t2img , t3img)
+
+                    vper_img = mm256Permute2f128Pd(hadd0img , hadd1img , [0,0,1,0,0,0,0,1])
+                    vble_img = mm256BlendPd(hadd0img , hadd1img , [1,1,0,0])
+
+                    instr1 = mm256StoreGd(mm256AddPd(mm256AddPd(vper_img , vble_img) , vcimg) , pc_img , range(nu))
+
+                    instructions += [instr0 , instr1]
                 else:
                     #this is the case of the general matrix matrix multiplication
                     vb0real = mm256LoadGd(Pointer(src1[s1L.of(0) , s1R.of(0) , 0]) , range(nu))
@@ -3201,6 +3624,356 @@ class _CmpDbl4BLAC(object):
                         instr2 = mm256StoreGd(vciimg , pcimg , range(nu))
 
                         instructions += [instr1 , instr2]
+
+        return instructions
+
+    def Kro(self, s0Params, s1Params, dParams, opts):
+
+        nu = 4
+        src0, src1, dst = s0Params['nuM'], s1Params['nuM'], dParams['nuM']
+        s0L, s0R = s0Params['nuML'], s0Params['nuMR']
+        s1L, s1R = s1Params['nuML'], s1Params['nuMR']
+        dL, dR   = dParams['nuML'], dParams['nuMR']
+        oM, oK, oN, oP = s0Params['M'], s0Params['N'], s1Params['M'], s1Params['N']
+        M, K, N, P = s0Params['nuMM'], s0Params['nuMN'], s1Params['nuMM'], s1Params['nuMN']
+        instructions = []
+
+        instructions += [ Comment(str(nu) + "-BLAC: " + str(M) + "x" + str(K) + " Kro " + str(N) + "x" + str(P)) ]
+        if oM*oK*oN*oP == 1:
+            #now working with complex numbers
+            pcreal = Pointer(dst[dL.of(0),dR.of(0) , 0])
+            pcimg = Pointer(dst[dL.of(0) , dR.of(0) , 1])
+
+            vareal = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0) , 0]), range(nu))
+            vaimg = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0) , 1]), range(nu))
+
+            vbreal = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0) , 0]), range(nu))
+            vbimg = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0) , 1]), range(nu))
+
+            treal = mm256MulPd(vareal , vbreal)
+            treal = mm256FnmaddPd(vaimg , vbimg , treal)
+            instr1 = mm256StoreGd(treal , pcreal , range(nu))
+
+            timg = mm256MulPd(vareal , vbimg)
+            timg = mm256FmaddPd(vaimg , vbreal , timg)
+            instr2 = mm256StoreGd(timg , pcimg , range(nu))
+
+            instructions += [ instr1 , instr2 ]
+        elif oM*oK == 1:
+            if s0Params['bcast']:
+                dup_real = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0) , 0]), range(nu))
+                dup_img = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0) , 1]), range(nu))
+            else:
+                va_real = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0) , 0]), range(nu))
+                va_img = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0) , 1]), range(nu))
+
+                repva_real = mm256Permute2f128Pd(va_real, va_real, [0,0,0,0,0,0,0,0]) #Need to replicate on the 2nd lane
+                repva_img = mm256Permute2f128Pd(va_img, va_img, [0,0,0,0,0,0,0,0]) #Need to replicate on the 2nd lane
+                dup_real = mm256ShufflePd(repva_real, repva_real, (0,0,0,0))
+                dup_img = mm256ShufflePd(repva_img, repva_img, (0,0,0,0))
+
+            if N*P == nu:
+                vb_real = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0) , 0]), range(nu))
+                vb_img = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0) , 1]), range(nu))
+
+                pc_real = Pointer(dst[dL.of(0),dR.of(0) , 0])
+                pc_img = Pointer(dst[dL.of(0),dR.of(0) , 1])
+
+                treal = mm256MulPd(dup_real , vb_real)
+                treal = mm256FnmaddPd(dup_img , vb_img , treal)
+
+                instr1 = mm256StoreGd(treal , pc_real , range(nu))
+
+                timg = mm256MulPd(dup_real , vb_img)
+                timg = mm256FmaddPd(dup_img , vb_real , timg)
+
+                instr2 = mm256StoreGd(timg , pc_img , range(nu))
+
+                instructions += [ instr1 , instr2 ]
+            else:
+                #                 va = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0)]), range(nu))
+                #                 repva = mm256Permute2f128Pd(va, va, [0,0,0,0,0,0,0,0]) #Need to replicate on the 2nd lane
+                #                 dup = mm256ShufflePd(repva, repva, (0,0,0,0))
+                for i in range(nu):
+                    vb_real = mm256LoadGd(Pointer(src1[s1L.of(i),s1R.of(0) , 0]), range(nu))
+                    vb_img = mm256LoadGd(Pointer(src1[s1L.of(i),s1R.of(0) , 1]), range(nu))
+
+                    pc_real = Pointer(dst[dL.of(i),dR.of(0) , 0])
+                    pc_img = Pointer(dst[dL.of(i),dR.of(0) , 1])
+
+                    treal = mm256MulPd(dup_real , vb_real)
+                    treal = mm256FnmaddPd(dup_img , vb_img , treal)
+
+                    instr1 = mm256StoreGd(treal , pc_real , range(nu))
+
+                    timg = mm256MulPd(dup_real , vb_img)
+                    timg = mm256FmaddPd(dup_img , vb_real , timg)
+
+                    instr2 = mm256StoreGd(timg , pc_img , range(nu))
+
+                    instructions += [ instr1 , instr2 ]
+
+        else:
+            if s1Params['bcast']:
+                dup_real = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0) , 0]), range(nu))
+                dup_img = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0) , 1]), range(nu))
+            else:
+                vb_real = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0) , 0]), range(nu))
+                vb_img = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0) , 1]), range(nu))
+
+                repvb_real = mm256Permute2f128Pd(vb_real, vb_real, [0,0,0,0,0,0,0,0]) #Need to replicate on the 2nd lane
+                repvb_img = mm256Permute2f128Pd(vb_img, vb_img, [0,0,0,0,0,0,0,0]) #Need to replicate on the 2nd lane
+
+                dup_real = mm256ShufflePd(repvb_real, repvb_real, (0,0,0,0))
+                dup_img = mm256ShufflePd(repvb_img, repvb_img, (0,0,0,0))
+
+            if M*K == nu:
+                va_real = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0) , 0]), range(nu))
+                va_img = mm256LoadGd(Pointer(src0[s0L.of(0),s0R.of(0) , 1]), range(nu))
+
+                pc_real = Pointer(dst[dL.of(0),dR.of(0) , 0])
+                pc_img = Pointer(dst[dL.of(0),dR.of(0) , 1])
+
+                treal = mm256MulPd(va_real , dup_real)
+                treal = mm256FnmaddPd(va_img , dup_img , treal)
+                instr1 = mm256StoreGd(treal , pc_real , range(nu))
+
+                timg = mm256MulPd(va_real , dup_img)
+                timg = mm256FmaddPd(va_img , dup_real , timg)
+                instr2 = mm256StoreGd(timg , pc_img , range(nu))
+
+                instructions += [ instr1 , instr2 ]
+
+            else:
+                #                 vb = mm256LoadGd(Pointer(src1[s1L.of(0),s1R.of(0)]), range(nu))
+                #                 repvb = mm256Permute2f128Pd(vb, vb, [0,0,0,0,0,0,0,0]) #Need to replicate on the 2nd lane
+                #                 dup = mm256ShufflePd(repvb, repvb, (0,0,0,0))
+                for i in range(nu):
+                    va_real = mm256LoadGd(Pointer(src0[s0L.of(i),s0R.of(0) , 0]), range(nu))
+                    va_img = mm256LoadGd(Pointer(src0[s0L.of(i),s0R.of(0) , 1]), range(nu))
+
+                    pc_real = Pointer(dst[dL.of(i),dR.of(0) , 0])
+                    pc_img = Pointer(dst[dL.of(i),dR.of(0) , 1])
+
+                    treal = mm256MulPd(va_real , dup_real)
+                    treal = mm256FnmaddPd(va_img , dup_img , treal)
+                    instr1 = mm256StoreGd(treal , pc_real , range(nu))
+
+                    timg = mm256MulPd(va_real , dup_img)
+                    timg = mm256FmaddPd(va_img , dup_real , timg)
+                    instr2 = mm256StoreGd(timg , pc_img , range(nu))
+
+                    instructions += [ instr1 , instr2 ]
+
+        return instructions
+
+class _CmpDbl4Loader(Loader):
+    def __init__(self):
+        super(_CmpDbl4Loader , self).__init__()
+
+    def loadMatrix(self , mParams):
+        src, dst = mParams['m'], mParams['nuM']
+        sL, sR = mParams['mL'], mParams['mR']
+        dL, dR = mParams['nuML'], mParams['nuMR']
+        M, N = mParams['M'], mParams['N']
+        nuMM, nuMN = mParams['nuMM'], mParams['nuMN']
+        isCompact = mParams['compact']
+        mStruct, mAccess = mParams['struct'], mParams['access']
+        instructions = []
+        nu = 4
+
+        instructions.append(Comment('AVX Loader:'))
+
+        if Matrix.testGeneral(mStruct , mAccess , M , N):
+            if M == 1 and N == 1:
+                pc_real = Pointer(dst[dL.of(0),dR.of(0) , 0])
+                pc_img = Pointer(dst[dL.of(0),dR.of(0) , 1])
+                #             vmask = [1] + 7*[0]
+                pa_real = AddressOf(sa(src[sL.of(0),sR.of(0) , 0]))
+                pa_img = AddressOf(sa(src[sL.of(0),sR.of(0) , 1]))
+                if mParams['bcast']:
+                    va_real = mm256LoadGd(pa_real, [tuple(range(nu))])
+                    va_img = mm256LoadGd(pa_img, [tuple(range(nu))])
+                else:
+                    va_real = mm256LoadGd(pa_real, [0])
+                    va_img = mm256LoadGd(pa_img, [0])
+
+                instr1 = mm256StoreGd(va_real, pc_real, range(nu))
+                instr2 = mm256StoreGd(va_img, pc_img, range(nu))
+
+                instructions += [ Comment(str(M) + "x" + str(N) + " -> " + str(nuMM) + "x" + str(nuMN)) ]
+                instructions += [ instr1 , instr2 ]
+
+            elif (N == 1 and ((M <= nu and not isCompact) or (M < nu and isCompact))) or (M == 1 and N < nu):
+
+                pc_real = Pointer(dst[dL.of(0),dR.of(0) , 0])
+                pc_img = Pointer(dst[dL.of(0),dR.of(0) , 1])
+
+                horizontal = M==1
+
+                pa_real = Pointer(src[sL.of(0),sR.of(0) , 0])
+                pa_img = Pointer(src[sL.of(0),sR.of(0) , 1])
+
+                va_real = mm256LoadGd(pa_real, range(max(M,N)), isCompact=isCompact, horizontal=horizontal)
+                va_img = mm256LoadGd(pa_img, range(max(M,N)), isCompact=isCompact, horizontal=horizontal)
+
+                instr1 = mm256StoreGd(va_real, pc_real, range(nu))
+                instr2 = mm256StoreGd(va_img, pc_img, range(nu))
+
+                instructions += [ Comment(str(M) + "x" + str(N) + " -> " + str(nuMM) + "x" + str(nuMN)) ]
+                instructions += [ instr1 , instr2 ]
+
+            elif ((M < nu and N < nu) or (M == nu and N > 1 and N < nu) or (M > 1 and M < nu and N == nu)):
+
+                pcs_real = [ Pointer(dst[dL.of(i),dR.of(0) , 0]) for i in range(nu) ]
+                pcs_img = [ Pointer(dst[dL.of(i),dR.of(0) , 1]) for i in range(nu) ]
+
+                pas_real = [ Pointer(src[sL.of(i),sR.of(0) , 0]) for i in range(M) ]
+                pas_img = [ Pointer(src[sL.of(i),sR.of(0) , 1]) for i in range(M) ]
+
+                vas_real = [ mm256LoadGd(pas_real[i], range(N)) for i in range(M) ]
+                vas_img = [ mm256LoadGd(pas_img[i], range(N)) for i in range(M) ]
+
+                instructions += [ Comment(str(M) + "x" + str(N) + " -> " + str(nuMM) + "x" + str(nuMN)) ]
+
+                instructions += [ mm256StoreGd(vas_real[i], pcs_real[i], range(nu)) for i in range(M) ]
+                instructions += [ mm256StoreGd(mm256SetzeroPd(), pcs_real[i], range(nu)) for i in range(M,nu) ]
+
+                instructions += [ mm256StoreGd(vas_img[i], pcs_img[i], range(nu)) for i in range(M) ]
+                instructions += [ mm256StoreGd(mm256SetzeroPd(), pcs_img[i], range(nu)) for i in range(M,nu) ]
+
+        elif Symmetric.testUpper(mStruct , mAccess , M , N):
+
+            vs_real = [mm256LoadGd(Pointer(src[sL.of(i),sR.of(i) , 0]), range(i,M), isCompact) for i in range(0, M-1)]
+            vs_img = [mm256LoadGd(Pointer(src[sL.of(i),sR.of(i) , 1]), range(i,M), isCompact) for i in range(0, M-1)]
+
+            vs_real.append(mm256LoadGd(Pointer(src[sL.of(M-1),sR.of(M-1) , 0]), [M-1], isCompact))
+            vs_real.extend([mm256SetzeroPd() for _ in range(M, 4)])
+            vs_img.append(mm256LoadGd(Pointer(src[sL.of(M-1),sR.of(M-1) , 1]), [M-1], isCompact))
+            vs_img.extend([mm256SetzeroPd() for _ in range(M, 4)])
+
+            if M == 1:
+                rows_real = vs_real
+                rows_img = vs_img
+            elif M == 2:
+                rows_real = [ vs_real[0] ]
+                rows_real.append( mm256ShufflePd(vs_real[0], vs_real[1], (0,0,1,1)) )
+                rows_real.extend(vs_real[2:])
+
+                rows_img = [ vs_img[0] ]
+                rows_img.append( mm256ShufflePd(vs_img[0], vs_img[1], (0,0,1,1)) )
+                rows_img.extend(vs_img[2:])
+            elif M == 3:
+                rows_real = [ vs_real[0] ]
+                r1to2_real = mm256ShufflePd(vs_real[0], vs_real[1], (0,0,1,1))
+                rows_real.append( mm256BlendPd(r1to2_real, vs_real[1], (1,1,0,0)) )
+                r1p2_real = mm256ShufflePd(vs_real[0], vs_real[1], (0,0,0,0))
+                rows_real.append( mm256Permute2f128Pd(r1p2_real, vs_real[2], (0,0,1,1,0,0,0,1)) )
+                rows_real.append(vs_real[3])
+
+                rows_img = [ vs_img[0] ]
+                r1to2_img = mm256ShufflePd(vs_img[0], vs_img[1], (0,0,1,1))
+                rows_img.append( mm256BlendPd(r1to2_img, vs_img[1], (1,1,0,0)) )
+                r1p2_img = mm256ShufflePd(vs_img[0], vs_img[1], (0,0,0,0))
+                rows_img.append( mm256Permute2f128Pd(r1p2_img, vs_img[2], (0,0,1,1,0,0,0,1)) )
+                rows_img.append(vs_img[3])
+            else:
+                rows_real = [ vs_real[0] ]
+                r1to2_real = mm256ShufflePd(vs_real[0], vs_real[1], (0,0,1,1))
+                rows_real.append( mm256BlendPd(r1to2_real, vs_real[1], (1,1,0,0)) )
+                r1p2_real = mm256ShufflePd(vs_real[0], vs_real[1], (0,0,0,0))
+                rows_real.append( mm256Permute2f128Pd(r1p2_real, vs_real[2], (0,0,1,1,0,0,0,1)) )
+                r1p2_real = mm256ShufflePd(vs_real[0], vs_real[1], (1,1,0,0))
+                r3p4_real = mm256ShufflePd(vs_real[2], vs_real[3], (1,1,0,0))
+                rows_real.append( mm256Permute2f128Pd(r1p2_real, r3p4_real, (0,0,1,1,0,0,0,1)) )
+
+                rows_img = [ vs_img[0] ]
+                r1to2_img = mm256ShufflePd(vs_img[0], vs_img[1], (0,0,1,1))
+                rows_img.append( mm256BlendPd(r1to2_img, vs_img[1], (1,1,0,0)) )
+                r1p2_img = mm256ShufflePd(vs_img[0], vs_img[1], (0,0,0,0))
+                rows_img.append( mm256Permute2f128Pd(r1p2_img, vs_img[2], (0,0,1,1,0,0,0,1)) )
+                r1p2_img = mm256ShufflePd(vs_img[0], vs_img[1], (1,1,0,0))
+                r3p4_img = mm256ShufflePd(vs_img[2], vs_img[3], (1,1,0,0))
+                rows_img.append( mm256Permute2f128Pd(r1p2_img, r3p4_img, (0,0,1,1,0,0,0,1)) )
+
+            pcs_real = [Pointer(dst[dL.of(i),dR.of(0) , 0]) for i in range(4)]
+            pcs_img = [Pointer(dst[dL.of(i),dR.of(0) , 1]) for i in range(4)]
+
+            comm = Comment('%dx%d -> 4x4 - %s' % (M, N, 'UpSymm'))
+
+            instrs_real = [mm256StoreGd(v, pc, [0, 1, 2, 3]) for v, pc in zip(rows_real, pcs_real)]
+            instrs_img = [mm256StoreGd(v, pc, [0, 1, 2, 3]) for v, pc in zip(rows_img, pcs_img)]
+
+            instructions.extend([comm] + instrs_real + instrs_img)
+
+        return instructions
+
+class _CmpDbl4Storer(Storer):
+
+    def __init__(self):
+        super(_CmpDbl4Storer , self).__init__()
+
+    def storeMatrix(self , mParams):
+        src, dst = mParams['nuM'], mParams['m']
+        sL, sR = mParams['nuML'], mParams['nuMR']
+        dL, dR = mParams['mL'], mParams['mR']
+        M, N = mParams['M'], mParams['N']
+        isCompact = mParams['compact']
+        mStruct, mAccess = mParams['struct'], mParams['access']
+        instructions = []
+        nu = 4
+
+        instructions.append(Comment('AVX Storer:'))
+
+        if Matrix.testGeneral(mStruct , mAccess , M , N):
+            if M == 1 and N == 1:
+                pc_real = AddressOf(sa(dst[dL.of(0),dR.of(0) , 0]))
+                pc_img = AddressOf(sa(dst[dL.of(0),dR.of(0) , 1]))
+
+                va_real = mm256LoadGd(Pointer(src[sL.of(0),sR.of(0) , 0]), range(nu))
+                va_img = mm256LoadGd(Pointer(src[sL.of(0),sR.of(0) , 1]), range(nu))
+
+                instr1 = mm256StoreGd(va_real, pc_real,[0])
+                instr2 = mm256StoreGd(va_img, pc_img,[0])
+
+                instructions += [ instr1 , instr2 ]
+            elif (N == 1 and ((M <= nu and not isCompact) or (M < nu and isCompact))) or (M == 1 and N < nu):
+                va_real = mm256LoadGd(Pointer(src[sL.of(0),sR.of(0) , 0]), range(nu))
+                va_img = mm256LoadGd(Pointer(src[sL.of(0),sR.of(0) , 1]), range(nu))
+
+                pc_real = Pointer(dst[dL.of(0),dR.of(0) , 0])
+                pc_img = Pointer(dst[dL.of(0),dR.of(0) , 1])
+
+                horizontal = M==1
+
+                instr1 = mm256StoreGd(va_real, pc_real, range(max(M,N)), isCompact=isCompact, horizontal=horizontal)
+                instr2 = mm256StoreGd(va_img, pc_img, range(max(M,N)), isCompact=isCompact, horizontal=horizontal)
+
+                instructions += [ instr1 , instr2 ]
+            elif mAccess.intersect(Map("{[i,j]->[i,j]}")) == mAccess and ((M < nu and N < nu) or (M == nu and N > 1 and N < nu) or (M > 1 and M < nu and N == nu)):
+
+                pcs_real = [ Pointer(dst[dL.of(i),dR.of(0) , 0]) for i in range(M) ]
+                pcs_img = [ Pointer(dst[dL.of(i),dR.of(0) , 1]) for i in range(M) ]
+
+                vas_real = [ mm256LoadGd(Pointer(src[sL.of(i),sR.of(0) , 0]), range(nu)) for i in range(M) ]
+                vas_img = [ mm256LoadGd(Pointer(src[sL.of(i),sR.of(0) , 1]), range(nu)) for i in range(M) ]
+
+                instrs_real = [ mm256StoreGd(vas_real[i], pcs_real[i], range(N)) for i in range(M) ]
+                instrs_img = [ mm256StoreGd(vas_img[i], pcs_img[i], range(N)) for i in range(M) ]
+                instructions += instrs_real
+                instructions += instrs_img
+
+        elif Symmetric.testUpper(mStruct , mAccess , M , N):
+            nuvs_real = [mm256LoadGd(Pointer(src[sL.of(i),sR.of(0) , 0]), [0, 1, 2, 3], isCompact, zeromask=range(0, i)) for i in range(M)]
+            nuvs_img = [mm256LoadGd(Pointer(src[sL.of(i),sR.of(0) , 1]), [0, 1, 2, 3], isCompact, zeromask=range(0, i)) for i in range(M)]
+
+            pcs_real = [Pointer(dst[dL.of(i),dR.of(i) , 0]) for i in range(M)]
+            pcs_img = [Pointer(dst[dL.of(i),dR.of(i) , 1]) for i in range(M)]
+
+            comm = Comment("4x4 -> %dx%d - %s" % (M, N, 'UpSymm'))
+            instrs_real = [mm256StoreGd(nuvs_real[i], pcs_real[i], range(i,M), isCompact) for i in range(M)]
+            instrs_img = [mm256StoreGd(nuvs_img[i], pcs_img[i], range(i,M), isCompact) for i in range(M)]
+            instructions.extend([comm] + instrs_real + instrs_img)
 
         return instructions
 
@@ -3997,9 +4770,9 @@ class AVX(ISA):
         cm_fp_m256d['set']   = [ mm256SetzeroPd, mm256Set1Pd ]
         cm_fp_m256d['move']  = [ ]
         cm_fp_m256d['store'] = [ mm256StoreGd ]
-        re_fp_m256d['loader'] = _Dbl4Loader() #this needs to change
+        cm_fp_m256d['loader'] = _CmpDbl4Loader()
         cm_fp_m256d['nublac'] = _CmpDbl4BLAC()
-        re_fp_m256d['storer'] = _Dbl4Storer() #this needs to change
+        cm_fp_m256d['storer'] = _CmpDbl4Storer()
         cm_fp_m256d['loadreplacer'] = AVXLoadReplacer(opts)
 
 

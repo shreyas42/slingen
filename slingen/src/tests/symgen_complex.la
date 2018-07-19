@@ -1,0 +1,5 @@
+Matrix S(@m,@m) <Input , Symmetric , UpperStorage , Complex  BlkInterLeaved>;
+Matrix A(@m,@m) <Input , Complex  BlkInterLeaved>;
+Matrix C(@m,@m) <Output , Complex  BlkInterLeaved>;
+
+C = S*A;

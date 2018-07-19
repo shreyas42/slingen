@@ -44,11 +44,12 @@ if __name__ == '__main__':
 
     experiments = [
 
-#        ('gemm_complex',testing1toNParam, [(16, 16, 8), [('m', lambda N: N), ('k', lambda N: N), ('n', lambda N: N)] ], 'gemm_complex-4-124-24') ,
+        ('gemm_complex',testing1toNParam, [(5, 5, 8), [('m', lambda N: N), ('k', lambda N: N), ('n', lambda N: N)] ], 'gemm_complex-4-124-24') ,
 #       ('gemm',testing1toNParam, [(7, 7, 8), [('m', lambda N: N), ('k', lambda N: N), ('n', lambda N: N)] ], 'gemm-7-7-24') ,
 #        ('trsyl', testing1toNParam, [(4, 4, 24), [('m', lambda n: n), ('n', lambda n: n)]], 'trsyl-4-124-24') ,
 #        ('lu_complex' , testingNParam , [ [('m' , 4 , 4 , 8)] ] , 'lu_complex-4-124-24') ,
-        ('symgen' , testingNParam , [ [('m' , 14 , 14, 4)] ] , 'dbg_symgen-9-9-0') ,
+#        ('symgen' , testingNParam , [ [('m' , 12 , 12, 4)] ] , 'dbg_symgen-5-5-0') ,
+#         ('symgen_complex' , testingNParam , [ [('m' , 8 , 8, 4)] ] , 'comp_symgen-4-4-0') ,
 #        ('ugem' , testingNParam , [ [('m' , 7, 7, 4)] ] , 'testing-12')
 
     ]
