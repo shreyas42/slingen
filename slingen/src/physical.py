@@ -71,6 +71,10 @@ class Array(ExplicitLayout):
             self.field = 'RowMajor'
         else:
             self.field = field #this keeps track of which reference
+        if self.field == 'BlkInterLeaved':
+            self.blocksize = opts['nu']
+        else:
+            self.blocksize = None
 
     def getField(self):
         return self.field

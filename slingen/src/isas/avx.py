@@ -3767,6 +3767,74 @@ class _CmpDbl4BLAC(object):
 
         return instructions
 
+    def T(self, sParams, dParams, opts):
+
+        nu = 4
+        src, dst = sParams['nuM'], dParams['nuM']
+        sL, sR = sParams['nuML'], sParams['nuMR']
+        dL, dR = dParams['nuML'], dParams['nuMR']
+        M, N = dParams['nuMM'], dParams['nuMN']
+        instructions = []
+
+        instructions += [ Comment(str(nu) + "-BLAC: (" + str(N) + "x" + str(M) + ")^T") ]
+        if M*N == nu:
+            va_real = mm256LoadGd(Pointer(src[sL.of(0),sR.of(0) , 0]), range(nu))
+            va_img = mm256LoadGd(Pointer(src[sL.of(0),sR.of(0) , 1]), range(nu))
+            pc_real = Pointer(dst[dL.of(0),dR.of(0) , 0])
+            pc_img = Pointer(dst[dL.of(0),dR.of(0) , 1])
+            instr_real = mm256StoreGd(va_real, pc_real, range(nu))
+            instr_img = mm256StoreGd(va_img, pc_img, range(nu))
+            instructions += [ instr_real , instr_img ]
+        else:
+            va0_real = mm256LoadGd(Pointer(src[sL.of(0),sR.of(0) , 0]), range(nu))
+            va1_real = mm256LoadGd(Pointer(src[sL.of(1),sR.of(0) , 0]), range(nu))
+            va2_real = mm256LoadGd(Pointer(src[sL.of(2),sR.of(0) , 0]), range(nu))
+            va3_real = mm256LoadGd(Pointer(src[sL.of(3),sR.of(0) , 0]), range(nu))
+
+            va0_img = mm256LoadGd(Pointer(src[sL.of(0),sR.of(0) , 1]), range(nu))
+            va1_img = mm256LoadGd(Pointer(src[sL.of(1),sR.of(0) , 1]), range(nu))
+            va2_img = mm256LoadGd(Pointer(src[sL.of(2),sR.of(0) , 1]), range(nu))
+            va3_img = mm256LoadGd(Pointer(src[sL.of(3),sR.of(0) , 1]), range(nu))
+
+            tmp0_real = mm256UnpackloPd(va0_real, va1_real)
+            tmp1_real = mm256UnpackloPd(va2_real, va3_real)
+            tmp2_real = mm256UnpackhiPd(va0_real, va1_real)
+            tmp3_real = mm256UnpackhiPd(va2_real, va3_real)
+            col0_real = mm256Permute2f128Pd(tmp0_real, tmp1_real, [0,0,1,0,0,0,0,0])
+            col1_real = mm256Permute2f128Pd(tmp2_real, tmp3_real, [0,0,1,0,0,0,0,0])
+            col2_real = mm256Permute2f128Pd(tmp0_real, tmp1_real, [0,0,1,1,0,0,0,1])
+            col3_real = mm256Permute2f128Pd(tmp2_real, tmp3_real, [0,0,1,1,0,0,0,1])
+
+            pc0_real = Pointer(dst[dL.of(0),dR.of(0) , 0])
+            pc1_real = Pointer(dst[dL.of(1),dR.of(0) , 0])
+            pc2_real = Pointer(dst[dL.of(2),dR.of(0) , 0])
+            pc3_real = Pointer(dst[dL.of(3),dR.of(0) , 0])
+            instr0_real = mm256StoreGd(col0_real, pc0_real, range(nu))
+            instr1_real = mm256StoreGd(col1_real, pc1_real, range(nu))
+            instr2_real = mm256StoreGd(col2_real, pc2_real, range(nu))
+            instr3_real = mm256StoreGd(col3_real, pc3_real, range(nu))
+            instructions += [ instr0_real, instr1_real, instr2_real, instr3_real ]
+
+            tmp0_img = mm256UnpackloPd(va0_img, va1_img)
+            tmp1_img = mm256UnpackloPd(va2_img, va3_img)
+            tmp2_img = mm256UnpackhiPd(va0_img, va1_img)
+            tmp3_img = mm256UnpackhiPd(va2_img, va3_img)
+            col0_img = mm256Permute2f128Pd(tmp0_img, tmp1_img, [0,0,1,0,0,0,0,0])
+            col1_img = mm256Permute2f128Pd(tmp2_img, tmp3_img, [0,0,1,0,0,0,0,0])
+            col2_img = mm256Permute2f128Pd(tmp0_img, tmp1_img, [0,0,1,1,0,0,0,1])
+            col3_img = mm256Permute2f128Pd(tmp2_img, tmp3_img, [0,0,1,1,0,0,0,1])
+
+            pc0_img = Pointer(dst[dL.of(0),dR.of(0) , 1])
+            pc1_img = Pointer(dst[dL.of(1),dR.of(0) , 1])
+            pc2_img = Pointer(dst[dL.of(2),dR.of(0) , 1])
+            pc3_img = Pointer(dst[dL.of(3),dR.of(0) , 1])
+            instr0_img = mm256StoreGd(col0_img, pc0_img, range(nu))
+            instr1_img = mm256StoreGd(col1_img, pc1_img, range(nu))
+            instr2_img = mm256StoreGd(col2_img, pc2_img, range(nu))
+            instr3_img = mm256StoreGd(col3_img, pc3_img, range(nu))
+            instructions += [ instr0_img, instr1_img, instr2_img, instr3_img ]
+        return instructions
+
 class _CmpDbl4Loader(Loader):
     def __init__(self):
         super(_CmpDbl4Loader , self).__init__()

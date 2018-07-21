@@ -8,7 +8,7 @@ from islpy import Set, Map
 
 from src.dsls.ll import Matrix, scalar_block
 from src.physical import Array
-from src.binding import getReference, ExplicitPhysicalReference
+from src.binding import getReference, ExplicitPhysicalReference , Reference
 
 from src.irbase import icode
 # from src.physical import *
@@ -29,10 +29,12 @@ class Allocator(object):
             is_complex = False
             if m.get_field() == 'complex':
                 is_complex = True
-            if is_complex:
+            '''if is_complex:
                 outPhys = Array(m.name, m.size, opts, safelyScalarize=opts['scarep'], field = 'BlkInterLeaved')
             else:
                 outPhys = Array(m.name, m.size, opts, safelyScalarize=opts['scarep'])
+            '''
+            outPhys = Reference.createArray(m , opts , useScalarize=True , useComplex = is_complex)
             if icode.bindingTable.addBinding(m, outPhys):
                 icode.declare += [outPhys]
     

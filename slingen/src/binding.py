@@ -640,11 +640,12 @@ class EnhancedBinder(NewBinder):
         order_of_decl = nx.topological_sort(g, reverse=True)
         for name in order_of_decl:
             mat = mat_dict[name]
-
-            phys_size = list(mat.size)
+            isComplex = False
+            #phys_size = list(mat.size)
             if mat.get_field() == 'complex':
-                phys_size[1] *= 2
-            phys_size = tuple(phys_size)
+            #    phys_size[1] *= 2
+                isComplex = True
+            #phys_size = tuple(phys_size)
 
             if mat.attr.get('fieldinfo' , None) is not None and len(mat.attr['fieldinfo']) > 1:
                 fieldParam = mat.attr['fieldinfo'][1]
@@ -657,7 +658,8 @@ class EnhancedBinder(NewBinder):
                 if not mat.attr['o'] and mat.isScalar():
                     physLayout = Scalars(mat.name, mat.size, opts, isIn=mat.attr['i'], isParam=True)
                 else:
-                    physLayout = Array(mat.name, phys_size, opts, isIn=mat.attr['i'], isOut=mat.attr['o'] , field = fieldParam)
+                    #physLayout = Array(mat.name, phys_size, opts, isIn=mat.attr['i'], isOut=mat.attr['o'] , field = fieldParam)
+                    physLayout = Reference.createArray(mat , opts , useIn = True , useOut = True , useComplex = isComplex , field = fieldParam)
                 if self.context.bindingTable.addBinding(mat, physLayout):
                     if mat.attr['t']:
                         physLayout.safelyScalarize = opts['scarep']
@@ -673,17 +675,18 @@ class EnhancedBinder(NewBinder):
         getattr(self, expr.inexpr[0].__class__.__name__)(expr.inexpr[0], opts)
         getattr(self, expr.inexpr[1].__class__.__name__)(expr.inexpr[1], opts)
         is_complex = False
-        phys_size = list(out.size)
+        #phys_size = list(out.size)
         if out.get_field() == 'complex':
-            phys_size[1] *= 2
+            #phys_size[1] *= 2
             is_complex = True
-        phys_size = tuple(phys_size)
+        #phys_size = tuple(phys_size)
         #using the hackish way to get shit done , will have to change later
-        if is_complex:
+        outPhys = Reference.createArray(out , opts , useScalarize=True , useComplex = is_complex)
+        '''if is_complex:
             outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'] , field = 'BlkInterLeaved')
         else:
             outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'])
-
+        '''
         if self.context.bindingTable.addBinding(out, outPhys):
             self.context.declare += [outPhys]
 
@@ -693,18 +696,19 @@ class EnhancedBinder(NewBinder):
             return
 
         getattr(self, expr.inexpr[0].__class__.__name__)(expr.inexpr[0], opts)
-        phys_size = list(out.size)
+        #phys_size = list(out.size)
         is_complex = False
         if out.get_field() == 'complex':
-            phys_size[1] *= 2
+        #    phys_size[1] *= 2
             is_complex = True
-        phys_size = tuple(phys_size)
+        #phys_size = tuple(phys_size)
 
-        if is_complex:
+        outPhys = Reference.createArray(out , opts , useScalarize=True , useComplex = is_complex)
+        '''if is_complex:
             outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'] , field = 'BlkInterLeaved')
         else:
             outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'])
-
+        '''
         if self.context.bindingTable.addBinding(out, outPhys):
             self.context.declare += [outPhys]
 
@@ -720,16 +724,19 @@ class EnhancedBinder(NewBinder):
             if self.context.bindingTable.isBound(out):
                 return
             getattr(self, expr.inexpr[0].__class__.__name__)(expr.inexpr[0], opts)
-            phys_size = list(out.size)
+            #phys_size = list(out.size)
             is_complex = False
             if out.get_field() == 'complex':
-                phys_size[1] *= 2
+            #    phys_size[1] *= 2
                 is_complex = True
-            phys_size = tuple(phys_size)
+            #phys_size = tuple(phys_size)
+            outPhys = Reference.createArray(out , opts , useScalarize=True , useComplex = is_complex)
+            '''
             if is_complex:
                 outPhys = Array(out.name, phys_size, opts , field = 'BlkInterLeaved')
             else:
                 outPhys = Array(out.name, phys_size, opts)
+            '''
             if self.context.bindingTable.addBinding(out, outPhys):
                 self.context.declare += [outPhys]
 
@@ -742,17 +749,19 @@ class EnhancedBinder(NewBinder):
 
         sub = expr.getInexprMat(0)
         safelyScalarize = opts['scarep'] and sub.size[0] <= opts['nu'] and sub.size[1] <= opts['nu']
-        phys_size = list(out.size)
+        #phys_size = list(out.size)
         is_complex = False
         if out.get_field() == 'complex':
-            phys_size[1] *= 2
+        #    phys_size[1] *= 2
             is_complex = True
-        phys_size = tuple(phys_size)
-
+        #phys_size = tuple(phys_size)
+        outPhys = Reference.createArray(out , opts , useScalarize=True , useComplex = is_complex)
+        '''
         if is_complex:
             outPhys = Array(out.name, phys_size, opts, safelyScalarize=safelyScalarize , field = 'BlkInterLeaved')
         else:
             outPhys = Array(out.name, phys_size, opts, safelyScalarize=safelyScalarize)
+        '''
         if self.context.bindingTable.addBinding(out, outPhys):
             self.context.declare += [outPhys]
 
@@ -769,26 +778,31 @@ class EnhancedBinder(NewBinder):
 
         sub = expr.getInexprMat(0)
 
-        phys_size = list(out.size)
+        #phys_size = list(out.size)
         is_complex = False
         if out.get_field() == 'complex':
-            phys_size[1] *= 2
+      #      phys_size[1] *= 2
             is_complex = True
-        phys_size = tuple(phys_size)
+       # phys_size = tuple(phys_size)
 
         if sub.size[0]*sub.size[1] <= opts['nu']*opts['nu']:
-            if is_complex:
+
+            outPhys = Reference.createArray(out , opts , useScalarize=True , useComplex = is_complex)
+            '''if is_complex:
                 outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'] , field = 'BlkInterLeaved')
             else:
                 outPhys = Array(out.name, phys_size, opts, safelyScalarize=opts['scarep'])
+            '''
             if self.context.bindingTable.addBinding(out, outPhys):
                 self.context.declare += [outPhys]
         else:
-            if is_complex:
+
+            outPhys = Reference.createArray(out , opts , useComplex = is_complex)
+            '''if is_complex:
                 outPhys = Array(out.name, phys_size, opts , field = 'BlkInterLeaved')
             else:
                 outPhys = Array(out.name, phys_size, opts)
-
+            '''
             if self.context.bindingTable.addBinding(out, outPhys):
                 self.context.declare += [outPhys]
 
@@ -800,6 +814,48 @@ class Reference(object):
     def __init__(self, matrix, physLayout):
         self.matrix = matrix
         self.physLayout = physLayout
+
+    @staticmethod
+    def createArray(mat , opts , useIn = False ,useOut = False , useScalarize =False, useComplex=False , field = None):
+        if useComplex:
+            phys_size = list(mat.size)
+            if opts['complexlayout'] == 'BlkInterLeaved':
+                #assuming that nu is going to be the block size
+                blocksize = opts['nu']
+                if phys_size[1] % blocksize != 0:
+                    phys_size[1] += (blocksize - (phys_size[1] % blocksize))
+                phys_size[1] *= 2
+
+            elif opts['complexlayout'] == 'Split':
+                pass
+
+            phys_size = tuple(phys_size)
+
+            if useIn and useOut:
+                if field is None:
+                    return Array(mat.name, phys_size, opts, isIn=mat.attr['i'] ,isOut = mat.attr['o'], field = opts['complexlayout'] )
+                else:
+                    return Array(mat.name, phys_size, opts, isIn=mat.attr['i'] ,isOut = mat.attr['o'], field = field )
+
+            elif useScalarize:
+                if field is None:
+                    return Array(mat.name, phys_size, opts, safelyScalarize=opts['scarep'], field = opts['complexlayout'] )
+                else:
+                    return Array(mat.name, phys_size, opts, safelyScalarize=opts['scarep'], field = field )
+
+            else:
+                if field is None:
+                    return Array(mat.name, phys_size, opts, field = opts['complexlayout'] )
+                else:
+                    return Array(mat.name, phys_size, opts, field = field )
+
+        else:
+            if useIn and useOut:
+                return Array(mat.name, mat.size, opts, isIn=mat.attr['i'] ,isOut = mat.attr['o'] )
+            elif useScalarize:
+                return Array(mat.name, mat.size, opts, safelyScalarize=opts['scarep'] )
+            else :
+                return Array(mat.name, mat.size, opts)
 
     @staticmethod
     def whatRef(PhysLayout):
@@ -816,7 +872,7 @@ class Reference(object):
             return ConstantReference
         else:
             return None
-    
+
     def __eq__(self, other):
         return self.physLayout == other.physLayout
 
@@ -842,6 +898,7 @@ class ExplicitPhysicalReference(Reference):
 class ArrayReference(ExplicitPhysicalReference):
     def __init__(self, matrix, physLayout):
         super(ArrayReference, self).__init__(matrix, physLayout)
+
 
     #mathematically we access element at i,j : this function maps this to a linear index in the physical storage of this matrix
     def getLinIdx(self, key):
@@ -886,11 +943,17 @@ class RowMajorInterArrayReference(ExplicitPhysicalReference):
         idx[0] += key[0]
         idx[1] += key[1]
         selection = key[2] # 0 for the real part , 1 for the imaginary part
-        block_size = 4 #this is under consideration
+        block_size = self.physLayout.blocksize #this is under consideration
         #this statement is problematic
         block_num = sympy.floor(idx[1] / block_size)
         e = idx[1] % block_size
+
+        #if self.matrix.size[1] % block_size == 0:
+        #    x = block_size
+        #else:
+        #    x = self.matrix.size[1] % block_size
         return (idx[0] * self.physLayout.pitch) + (2 * block_size * block_num) + e + (selection * block_size)
+        #return (idx[0] * self.physLayout.pitch) + (2 * block_size * block_num) + e + (selection * x)
 
     def pointerAt(self , key):
         linIdx = self.getLinIdx(key)

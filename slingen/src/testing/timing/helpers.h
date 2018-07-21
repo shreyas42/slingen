@@ -156,6 +156,26 @@ void comp_syms(FLOAT *m , size_t row , size_t col){
     }
 }
 
+void comp_rands(FLOAT *m , size_t row , size_t col){
+    for(size_t i=0;i<row;++i){
+        for(size_t j=0;j<col;++j){
+        int col1 = col;
+        if(col % 4 != 0){
+            col1 += (4 - (col % 4));
+        }
+            int realIndex , imgIndex;
+            realIndex = 2 * (col1 * i) + ((8*(j/4))+(j%4));
+            imgIndex = 2 * (col1 * i) + ((8*(j/4))+(j%4)) + 4;
+//            cout << "REAL INDEX : " << realIndex<<endl;
+//            cout << "IMG INDEX : " << imgIndex<<endl;
+            m[realIndex] = (FLOAT)(rand())/RAND_MAX + 1;
+            m[imgIndex] = (FLOAT)(rand())/RAND_MAX + 1;
+
+        }
+    }
+}
+
+
 template <typename Msg_Type>
 void dumpList(std::list< Msg_Type > const & l, string const & filename)
 {
