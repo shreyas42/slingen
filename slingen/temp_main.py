@@ -44,12 +44,12 @@ if __name__ == '__main__':
 
     experiments = [
 
-        ('gemm_complex',testing1toNParam, [(4, 4, 8), [('m', lambda N: N), ('k', lambda N: N), ('n', lambda N: N)] ], 'gemm_complex-4-124-24') ,
-#       ('gemm',testing1toNParam, [(16, 16, 8), [('m', lambda N: N), ('k', lambda N: N), ('n', lambda N: N)] ], 'gemm-7-7-24') ,
+        ('gemm_complex',testing1toNParam, [(2, 2, 4), [('m', lambda N: N), ('k', lambda N: N), ('n', lambda N: N)] ], 'gemm_complex_poster_tests') ,
+#       ('gemm',testing1toNParam, [(4, 20, 4), [('m', lambda N: N), ('k', lambda N: N), ('n', lambda N: N)] ], 'gemm-7-7-24') ,
 #        ('trsyl', testing1toNParam, [(4, 4, 24), [('m', lambda n: n), ('n', lambda n: n)]], 'trsyl-4-124-24') ,
 #        ('lu_complex' , testingNParam , [ [('m' , 4 , 4 , 8)] ] , 'lu_complex-4-124-24') ,
 #        ('symgen' , testingNParam , [ [('m' , 5 , 5, 4)] ] , 'dbg_symgen-5-5-0') ,
-#         ('symgen_complex' , testingNParam , [ [('m' , 12 , 12, 4)] ] , 'comp_symgen-4-4-0') ,
+#         ('symgen_complex' , testingNParam , [ [('m' , 4 , 24, 4)] ] , 'comp_symgen-4-4-0') ,
 #        ('ugem' , testingNParam , [ [('m' , 7, 7, 4)] ] , 'testing-12')
 
     ]
@@ -125,7 +125,7 @@ if __name__ == '__main__':
                     precomp_colors = None
                     precomp_lw = None
                 filename = '%s.%s.%s.pdf' % (exp_id, dev, date.today().isoformat())
-                resMgr.makePlot(opts, 0, 4, exp_description, "n [" +opts['precision']+ "]",
+                resMgr.makePlot(opts, 0, 8, exp_description, "n [" +opts['precision']+ "]",
                                 "Performance [f/c]", opts['logroot'], filename, addLegend=opts['addlegend'], addTitle=opts['addtitle'],
                                 xLabelStride=opts['xlabelstride'], series=precomp_series, seriesMarkers=precomp_markers,
                                 seriesColors=precomp_colors, seriesLw=precomp_lw, seriesLinestyles=precomp_linestyles, adjust_yaxis=False)

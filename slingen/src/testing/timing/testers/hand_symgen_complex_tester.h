@@ -15,7 +15,6 @@
 #include <cstring>
 #include <cmath>
 
-
 #ifdef TEST
 #include "tsc.h"
 #endif
@@ -23,7 +22,7 @@
 #include "helpers.h"
 #include "CommonDefs.h"
 
-#include "kernels/symgen_complex_kernel.h"
+#include "params.h"
 
 
 /*
@@ -45,6 +44,7 @@ inline void build(FLOAT ** S, FLOAT ** A, FLOAT ** C)
   //rands(*a, 1, 1);
   comp_syms(*S, PARAM0, PARAM0);
   rands(*A, PARAM0, 2 * PARAM0);
+  zeros(*C , PARAM0,2*PARAM0);
   //rands(*b, 1, 1);
 }
 
@@ -57,6 +57,28 @@ inline void destroy(FLOAT * A, FLOAT * B, FLOAT * C)
   aligned_free(C);
 }
 
+static __attribute__((noinline)) void kernel(double const * A, double const * B, double * C){
+    for(int k=0;k<PARAM0;++k){
+        for(int i=0;i<PARAM0;++i){
+              int areal_index = (2*PARAM0*i) + 8*(k/4) + (k % 4);
+              int aimg_index = (2*PARAM0*i) + 8*(k/4) + (k % 4) + 4;
+            for(int j=0;j<PARAM0;j++){
+
+              int creal_index = (2*PARAM0*i) + 8*(j/4) + (j % 4);
+              int cimg_index = (2*PARAM0*i) + 8*(j/4) + (j % 4) + 4;
+
+              int breal_index = (2*PARAM0*k) + 8*(j/4) + (j % 4);
+              int bimg_index = (2*PARAM0*k) + 8*(j/4) + (j % 4) + 4;
+
+              C[creal_index] += A[areal_index] * B[breal_index];
+              C[creal_index] -= A[aimg_index] * B[bimg_index];
+
+              C[cimg_index] += A[areal_index] * B[bimg_index];
+              C[cimg_index] += A[aimg_index] * B[breal_index];
+            }
+        }
+    }
+}
 int validate(FLOAT * A, FLOAT * B, FLOAT * C, double threshold)
 {
 

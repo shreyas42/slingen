@@ -22,7 +22,7 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(readlink -f libs/lib):$PYTHON2LIB
 
 #Eigen 3.3.4. Available at eigen.tuxfamily.org
 #E.g., assuming Eigen folder is in /opt/include/eigen
-#export EIGENROOT=/opt/include/eigen
+export EIGENROOT=/home/ravi/eigen
 
 #RECSY (also requires SLICOT). Available at www8.cs.umu.se/~isak/recsy/#Download
 #E.g., Assuming both librecsy.a and slicot.a are /opt/lib
