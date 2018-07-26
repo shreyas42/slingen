@@ -2094,8 +2094,7 @@ class _Dbl4BLAC(object):
 #                     instructions += [ mm256StoreGd(sol, pcs[3], range(nu)) ]
 #                     #Solve X20, X21, X22, X23
 #                     #bcast U23
-#                     dupa23 = mm256UnpackhiPd(vas[2], vas[2])
-#                     bca23 = mm256Permute2f128Pd(dupa23, dupa23, [0,0,1,1,0,0,0,1])
+#                     dupa23 = mm256UnpackhiPd(vas[2], vas[2])#                     bca23 = mm2565er5ute2f128Pd(dupa23, dupa23, [0,0,1,1,0,0,0,1])
 #                     x3 = mm256LoadGd(pcs[3], range(nu))
 #                     sol = mm256MulPd(rdiags[2], mm256SubPd(vbs[2], mm256MulPd(bca23, x3)))
 #                     instructions += [ mm256StoreGd(sol, pcs[2], range(nu)) ]
@@ -3427,8 +3426,6 @@ class _CmpDbl4BLAC(object):
                 va3img = mm256LoadGd(Pointer(src0[s0L.of(3) , s0R.of(0) , 1]) , [tuple(range(nu))])
 
                 #loading the row vector B
-                #this is pretty wonky indexing
-                #will have to look for a cleaner approach
                 vb0real = mm256LoadGd(Pointer(src1[s1L.of(0) , s1R.of(0) , 0]) , range(nu))
                 vb0img = mm256LoadGd(Pointer(src1[s1L.of(0) , s1R.of(0) , 1]) , range(nu))
 
@@ -3478,8 +3475,8 @@ class _CmpDbl4BLAC(object):
                 vc2img = mm256FmaddPd(va2real , vb0img , vc2img)
                 vc2img = mm256FmaddPd(va2img , vb0real , vc2img)
 
-                instr5 = mm256StoreGd(vc0real , pc0real , range(nu))
-                instr6 = mm256StoreGd(vc0img , pc0img , range(nu))
+                instr5 = mm256StoreGd(vc2real , pc2real , range(nu))
+                instr6 = mm256StoreGd(vc2img , pc2img , range(nu))
 
                 vc3real = mm256FmaddPd(va3real , vb0real , vc3real)
                 vc3real = mm256FnmaddPd(va3img , vb0img , vc3real)
@@ -3584,8 +3581,8 @@ class _CmpDbl4BLAC(object):
                     vb3img = mm256LoadGd(Pointer(src1[s1L.of(3) , s1R.of(0) , 1]) , range(nu))
 
                     for i in range(nu):
-                        vcireal = mm256LoadGd(Pointer(dst[dL.of(i) , dR.of(0) , 0]) , range(nu))
-                        vciimg = mm256LoadGd(Pointer(dst[dL.of(i) , dR.of(0) , 1]) , range(nu))
+                        vcireal = mm256LoadGd(Pointer(src2[s2L.of(i) , s2R.of(0) , 0]) , range(nu))
+                        vciimg = mm256LoadGd(Pointer(src2[s2L.of(i) , s2R.of(0) , 1]) , range(nu))
 
                         pcreal = Pointer(dst[dL.of(i) , dR.of(0) , 0])
                         pcimg = Pointer(dst[dL.of(i) , dR.of(0) , 1])
